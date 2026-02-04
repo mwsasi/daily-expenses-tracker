@@ -1,45 +1,34 @@
 
 import React from 'react';
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, Calendar, Calculator } from 'lucide-react';
+import { TrendingDown, Wallet, Calendar, ArrowUpCircle, Landmark, Zap, BarChart3, Target, PieChart, IndianRupee } from 'lucide-react';
 import { DailySummary } from '../types';
 
 interface StatsProps {
-  summary: DailySummary & { todayExpenses: number, todayIncome: number };
+  summary: DailySummary & { 
+    todayExpenses: number, 
+    todayIncome: number, 
+    totalSavings: number,
+    todaySavings?: number,
+    cumulativeIncome: number,
+    totalBudget: number,
+    openingBalance: number
+  };
+  activeTab?: string;
+  onTabChange?: (tab: any) => void;
 }
 
-const Stats: React.FC<StatsProps> = ({ summary }) => {
-  const cards = [
-    {
-      label: 'Total Available',
-      value: summary.currentBalance,
-      icon: <Wallet className="w-6 h-6 text-emerald-600" />,
-      bgColor: 'bg-emerald-50',
-      textColor: 'text-emerald-700',
-      isPrimary: true
-    },
-    {
-      label: 'Opening Balance',
-      value: summary.openingBalance,
-      icon: <Calculator className="w-6 h-6 text-blue-600" />,
-      bgColor: 'bg-blue-50',
-      textColor: 'text-blue-700'
-    },
-    {
-      label: "Today's Spent",
-      value: summary.todayExpenses,
-      icon: <Calendar className="w-6 h-6 text-orange-600" />,
-      bgColor: 'bg-orange-50',
-      textColor: 'text-orange-700'
-    },
-    {
-      label: 'Monthly Expenses',
-      value: summary.totalExpenses,
-      icon: <TrendingDown className="w-6 h-6 text-rose-600" />,
-      bgColor: 'bg-rose-50',
-      textColor: 'text-rose-700'
-    }
-  ];
+interface StatCard {
+  id: string;
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  bgColor: string;
+  isPrimary?: boolean;
+  clickable?: boolean;
+  accentColor: string;
+}
 
+const Stats: React.FC<StatsProps> = ({ summary, activeTab, onTabChange }) => {
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat(undefined, { 
       minimumFractionDigits: 2, 
@@ -47,17 +36,124 @@ const Stats: React.FC<StatsProps> = ({ summary }) => {
     }).format(val);
   };
 
+  const isSavingsTab = activeTab === 'savings';
+
+  const overviewCards: StatCard[] = [
+    {
+      id: 'overview',
+      label: 'Liquid Cash',
+      value: summary.currentBalance,
+      icon: <Wallet className="w-6 h-6" />,
+      bgColor: 'bg-emerald-50',
+      accentColor: 'text-emerald-600',
+      isPrimary: true
+    },
+    {
+      id: 'income',
+      label: "Opening Balance",
+      value: summary.openingBalance,
+      icon: <IndianRupee className="w-6 h-6" />,
+      bgColor: 'bg-blue-50',
+      accentColor: 'text-blue-600'
+    },
+    {
+      id: 'income',
+      label: "Today's Income",
+      value: summary.todayIncome,
+      icon: <ArrowUpCircle className="w-6 h-6" />,
+      bgColor: 'bg-emerald-50',
+      accentColor: 'text-emerald-500',
+      clickable: true
+    },
+    {
+      id: 'expenses',
+      label: "Today's Spend",
+      value: summary.todayExpenses,
+      icon: <Zap className="w-6 h-6" />,
+      bgColor: 'bg-amber-50',
+      accentColor: 'text-amber-600',
+      clickable: true
+    },
+    {
+      id: 'income',
+      label: 'Cumulative Wealth',
+      value: summary.cumulativeIncome,
+      icon: <BarChart3 className="w-6 h-6" />,
+      bgColor: 'bg-indigo-50',
+      accentColor: 'text-indigo-600'
+    },
+    {
+      id: 'budget',
+      label: 'Monthly Budget',
+      value: summary.totalBudget,
+      icon: <Target className="w-6 h-6" />,
+      bgColor: 'bg-slate-50',
+      accentColor: 'text-slate-600'
+    },
+    {
+      id: 'expenses',
+      label: 'Monthly Expenses',
+      value: summary.totalExpenses,
+      icon: <TrendingDown className="w-6 h-6" />,
+      bgColor: 'bg-rose-50',
+      accentColor: 'text-rose-600'
+    }
+  ];
+
+  const savingsCards: StatCard[] = [
+    {
+      id: 'savings',
+      label: 'Portfolio Value',
+      value: summary.totalSavings,
+      icon: <PieChart className="w-6 h-6" />,
+      bgColor: 'bg-teal-50',
+      accentColor: 'text-teal-600',
+      isPrimary: true
+    },
+    {
+      id: 'savings',
+      label: "Today's Wealth Growth",
+      value: summary.todaySavings || 0,
+      icon: <Calendar className="w-6 h-6" />,
+      bgColor: 'bg-teal-50',
+      accentColor: 'text-teal-500'
+    },
+    {
+      id: 'savings',
+      label: 'Net Monthly Sav.',
+      value: summary.netSavings,
+      icon: <ArrowUpCircle className="w-6 h-6" />,
+      bgColor: 'bg-teal-50',
+      accentColor: 'text-teal-600'
+    },
+    {
+      id: 'savings',
+      label: 'Total Net Worth',
+      value: summary.currentBalance + summary.totalSavings,
+      icon: <Landmark className="w-6 h-6" />,
+      bgColor: 'bg-indigo-50',
+      accentColor: 'text-indigo-600'
+    }
+  ];
+
+  const cards = isSavingsTab ? savingsCards : overviewCards;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${isSavingsTab ? 'lg:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-4'} gap-6`}>
       {cards.map((card, i) => (
-        <div key={i} className={`bg-white p-5 rounded-2xl shadow-sm border ${card.isPrimary ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-100'} flex items-start justify-between`}>
+        <div 
+          key={i} 
+          onClick={() => card.clickable && onTabChange?.(card.id as any)}
+          className={`bg-white p-7 rounded-[2.5rem] shadow-sm border ${card.isPrimary ? (isSavingsTab ? 'border-teal-200 ring-4 ring-teal-50' : 'border-emerald-200 ring-4 ring-emerald-50') : 'border-slate-100'} flex items-start justify-between transition-all duration-300 hover:shadow-xl hover:border-slate-200 ${card.clickable ? 'cursor-pointer hover:-translate-y-1 active:scale-95' : ''}`}
+        >
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{card.label}</p>
-            <p className={`text-2xl font-black ${card.isPrimary ? 'text-emerald-700' : 'text-slate-800'}`}>Rs {formatCurrency(card.value)}</p>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{card.label}</p>
+              {card.clickable && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>}
+            </div>
+            <p className={`text-2xl font-black ${card.isPrimary ? (isSavingsTab ? 'text-teal-800' : 'text-emerald-800') : 'text-slate-900'}`}>Rs {formatCurrency(card.value)}</p>
           </div>
-          <div className={`${card.bgColor} p-3 rounded-xl`}>
-            {card.icon}
-          </div>
+          <div className={`${card.bgColor} ${card.accentColor} p-4 rounded-2xl`}>{card.icon}</div>
         </div>
       ))}
     </div>

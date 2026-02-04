@@ -1,22 +1,28 @@
 
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { Transaction, TransactionType } from '../types';
-import { CATEGORY_CONFIG } from '../constants';
+import { Transaction, TransactionType, CategoryConfig } from '../types';
+import { getCategoryConfig } from '../constants';
 
 interface ChartsProps {
   transactions: Transaction[];
+  customCategories: CategoryConfig[];
 }
 
-const Charts: React.FC<ChartsProps> = ({ transactions }) => {
+const Charts: React.FC<ChartsProps> = ({ transactions, customCategories }) => {
   const expenseData = transactions
     .filter(t => t.type === TransactionType.EXPENSE)
     .reduce((acc, curr) => {
       const existing = acc.find(item => item.name === curr.category);
+      const config = getCategoryConfig(curr.category, customCategories);
       if (existing) {
         existing.value += curr.amount;
       } else {
-        acc.push({ name: curr.category, value: curr.amount, color: CATEGORY_CONFIG[curr.category].color.replace('bg-', '') });
+        acc.push({ 
+          name: curr.category, 
+          value: curr.amount, 
+          color: config.color.replace('bg-', '') 
+        });
       }
       return acc;
     }, [] as any[]);
@@ -36,6 +42,8 @@ const Charts: React.FC<ChartsProps> = ({ transactions }) => {
       'rose-500': '#f43f5e',
       'teal-500': '#14b8a6',
       'gray-500': '#6b7280',
+      'pink-500': '#ec4899',
+      'violet-600': '#7c3aed',
     };
     return map[colorName] || '#000000';
   };

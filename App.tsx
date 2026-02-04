@@ -1,24 +1,36 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Transaction, TransactionType, Category, DailySummary } from './types';
-import { CATEGORY_CONFIG } from './constants';
+import { Transaction, TransactionType, Category, DailySummary, Budget, CategoryConfig } from './types';
+import { DEFAULT_CATEGORIES, getCategoryConfig, ICON_MAP } from './constants';
 import TransactionForm from './components/TransactionForm';
 import Stats from './components/Stats';
 import Charts from './components/Charts';
 import AIAssistant from './components/AIAssistant';
 import ReportView from './components/ReportView';
-import { Trash2, History, Wallet, LayoutDashboard, PlusCircle, FileText, Calendar, ArrowRightCircle, CheckCircle2, TrendingUp, Plus, ListFilter, BarChart3 } from 'lucide-react';
+import BudgetManager from './components/BudgetManager';
+import BudgetProgress from './components/BudgetProgress';
+import CategoryManager from './components/CategoryManager';
+import CompoundSavings from './components/CompoundSavings';
+import { Trash2, Wallet, LayoutDashboard, PlusCircle, FileText, TrendingUp, Target, PiggyBank, ArrowUpCircle, MoreHorizontal, Zap, BarChart3, ChevronRight, IndianRupee } from 'lucide-react';
 
-type TabType = 'overview' | 'income' | 'manage' | 'reports';
-type HistoryViewType = 'daily' | 'cumulative';
+type TabType = 'overview' | 'income' | 'expenses' | 'savings' | 'reports' | 'budget' | 'settings';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [historyView, setHistoryView] = useState<HistoryViewType>('daily');
-  const [openingInput, setOpeningInput] = useState<string>('');
-  const [quickIncomeInput, setQuickIncomeInput] = useState<string>('');
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('spendwise_transactions');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [budgets, setBudgets] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('spendwise_budgets');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [customCategories, setCustomCategories] = useState<CategoryConfig[]>(() => {
+    const saved = localStorage.getItem('spendwise_custom_categories');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -26,334 +38,361 @@ const App: React.FC = () => {
     localStorage.setItem('spendwise_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
-  const addTransaction = (newTransaction: Transaction) => {
+  useEffect(() => {
+    localStorage.setItem('spendwise_budgets', JSON.stringify(budgets));
+  }, [budgets]);
+
+  useEffect(() => {
+    localStorage.setItem('spendwise_custom_categories', JSON.stringify(customCategories));
+  }, [customCategories]);
+
+  const saveTransaction = (newTransaction: Transaction) => {
     setTransactions(prev => {
-      const existingIndex = prev.findIndex(t => 
-        t.date === newTransaction.date && 
-        t.category === newTransaction.category
-      );
-
-      if (existingIndex !== -1) {
-        const updated = [...prev];
-        const existing = updated[existingIndex];
-        let newNote = existing.note;
-        const incomingNote = newTransaction.note.trim();
-        const isDefaultNote = incomingNote === newTransaction.category;
-
-        if (!isDefaultNote && incomingNote !== "" && !existing.note.includes(incomingNote)) {
-          newNote = existing.note === existing.category 
-            ? incomingNote 
-            : `${existing.note}, ${incomingNote}`;
-        }
-
-        updated[existingIndex] = {
-          ...existing,
-          amount: existing.amount + newTransaction.amount,
-          note: newNote
-        };
-        return updated;
+      if (editingTransaction) {
+        setEditingTransaction(null);
+        return prev.map(t => t.id === newTransaction.id ? newTransaction : t);
       }
-
       return [newTransaction, ...prev];
     });
   };
 
-  const setInitialOpeningBalance = () => {
-    const amount = parseFloat(openingInput);
-    if (isNaN(amount) || amount < 0) return;
-    const newTransaction: Transaction = {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString().split('T')[0],
-      type: TransactionType.INCOME,
-      category: Category.OPENING_BALANCE,
-      amount: amount,
-      note: 'Initial Balance Setup',
-    };
-    addTransaction(newTransaction);
-    setOpeningInput('');
+  const updateBudget = (category: Category, amount: number) => {
+    setBudgets(prev => ({ ...prev, [category]: amount }));
   };
 
-  const addQuickDailyIncome = () => {
-    const amount = parseFloat(quickIncomeInput);
-    if (isNaN(amount) || amount <= 0) return;
-    const newTransaction: Transaction = {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString().split('T')[0],
-      type: TransactionType.INCOME,
-      category: Category.DAILY_INCOME,
-      amount: amount,
-      note: 'Quick Daily Income Entry',
-    };
-    addTransaction(newTransaction);
-    setQuickIncomeInput('');
-  };
-
-  const removeTransaction = (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
-  };
-
-  const clearAll = () => {
-    if (window.confirm("Are you sure you want to clear all data? This cannot be undone.")) {
-      setTransactions([]);
-    }
-  };
-
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  const summary = useMemo<DailySummary & { todayExpenses: number, todayIncome: number }>(() => {
-    // Initialize with explicit number type
-    let opening: number = 0;
-    let income: number = 0;
-    let expenses: number = 0;
-    let savings: number = 0;
-    let todayExp: number = 0;
-    let todayInc: number = 0;
-
-    transactions.forEach(t => {
-      const isToday = t.date === todayStr;
-      const amount = Number(t.amount);
+  const addCustomCategory = (cat: CategoryConfig) => setCustomCategories(prev => [...prev, cat]);
+  
+  const updateCustomCategory = (updatedCat: CategoryConfig) => {
+    const oldCat = customCategories.find(c => c.id === updatedCat.id);
+    if (oldCat && oldCat.name !== updatedCat.name) {
+      // Re-map transactions using the old name to the new name
+      setTransactions(prev => prev.map(t => 
+        t.category === oldCat.name ? { ...t, category: updatedCat.name } : t
+      ));
       
-      if (t.category === Category.OPENING_BALANCE) {
-        opening += amount;
-      } else if (t.category === Category.SAVINGS) {
-        savings += amount;
-        expenses += amount;
-        if (isToday) todayExp += amount;
-      } else if (t.type === TransactionType.INCOME) {
-        income += amount;
-        if (isToday) todayInc += amount;
-      } else {
-        expenses += amount;
-        if (isToday) todayExp += amount;
+      // Update budgets if applicable
+      setBudgets(prev => {
+        const newBudgets = { ...prev };
+        if (newBudgets[oldCat.name] !== undefined) {
+          newBudgets[updatedCat.name] = newBudgets[oldCat.name];
+          delete newBudgets[oldCat.name];
+        }
+        return newBudgets;
+      });
+    }
+    setCustomCategories(prev => prev.map(c => c.id === updatedCat.id ? updatedCat : c));
+  };
+
+  const deleteCustomCategory = (id: string) => {
+    const catToDelete = customCategories.find(c => c.id === id);
+    if (catToDelete) {
+      // Re-map orphaned transactions to default categories
+      setTransactions(prev => prev.map(t => {
+        if (t.category === catToDelete.name) {
+          let fallback = 'Others';
+          if (t.type === TransactionType.INCOME) fallback = 'Daily Income';
+          if (t.type === TransactionType.SAVINGS) fallback = 'Savings';
+          return { ...t, category: fallback };
+        }
+        return t;
+      }));
+      
+      // Clean up budgets
+      setBudgets(prev => {
+        const newBudgets = { ...prev };
+        delete newBudgets[catToDelete.name];
+        return newBudgets;
+      });
+    }
+    setCustomCategories(prev => prev.filter(c => c.id !== id));
+  };
+
+  const removeTransaction = (id: string) => setTransactions(prev => prev.filter(t => t.id !== id));
+  const clearAll = () => { if (window.confirm("Delete all data? This cannot be undone.")) setTransactions([]); };
+
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const currentMonthStr = useMemo(() => new Date().toISOString().substring(0, 7), []);
+
+  const monthlySpending = useMemo(() => {
+    const totals: Record<string, number> = {};
+    transactions.forEach(t => {
+      if (t.date.startsWith(currentMonthStr) && t.type === TransactionType.EXPENSE) {
+        totals[t.category] = (totals[t.category] || 0) + Number(t.amount);
       }
     });
+    return totals;
+  }, [transactions, currentMonthStr]);
+
+  const summary = useMemo(() => {
+    let opening = 0, income = 0, expenses = 0, currentMonthSavings = 0, todayExp = 0, todayInc = 0, todaySav = 0, liquid = 0, cumulativeInc = 0;
+    
+    transactions.forEach(t => {
+      const isToday = t.date === todayStr;
+      const isCurrentMonth = t.date.startsWith(currentMonthStr);
+      const amount = Number(t.amount) || 0;
+
+      // Global opening balance (all time)
+      if (t.category === 'Opening Balance') opening += amount;
+
+      if (t.type === TransactionType.INCOME) {
+        liquid += amount;
+        cumulativeInc += amount;
+      } else if (t.type === TransactionType.EXPENSE) {
+        liquid -= amount;
+      }
+
+      if (isCurrentMonth) {
+        if (t.type === TransactionType.SAVINGS) {
+          currentMonthSavings += amount;
+          if (isToday) todaySav += amount;
+        } else if (t.type === TransactionType.INCOME && t.category !== 'Opening Balance') {
+          income += amount;
+          if (isToday) todayInc += amount;
+        } else if (t.type === TransactionType.EXPENSE) {
+          expenses += amount;
+          if (isToday) todayExp += amount;
+        }
+      } else if (isToday) {
+        if (t.type === TransactionType.INCOME && t.category !== 'Opening Balance') todayInc += amount;
+        else if (t.type === TransactionType.EXPENSE) todayExp += amount;
+      }
+    });
+
+    const totalSav = transactions.filter(t => t.type === TransactionType.SAVINGS).reduce((s, t) => s + t.amount, 0);
+    const totalBudgetValue = Object.values(budgets).reduce((sum, val) => sum + (val || 0), 0);
 
     return {
       openingBalance: opening,
       totalIncome: income,
       totalExpenses: expenses,
-      netSavings: savings,
-      // Fix: Use explicit arithmetic with number types
-      currentBalance: (opening + income - expenses) as number,
+      netSavings: currentMonthSavings,
+      totalSavings: totalSav,
+      todaySavings: todaySav,
+      currentBalance: liquid,
       todayExpenses: todayExp,
-      todayIncome: todayInc
+      todayIncome: todayInc,
+      cumulativeIncome: cumulativeInc,
+      totalBudget: totalBudgetValue
     };
-  }, [transactions, todayStr]);
+  }, [transactions, todayStr, currentMonthStr, budgets]);
 
-  const groupedTransactions = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {};
-    transactions.forEach(t => {
-      if (!groups[t.date]) groups[t.date] = [];
-      groups[t.date].push(t);
-    });
-    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [transactions]);
+  const budgetUsagePercent = Math.min((summary.totalExpenses / (summary.totalBudget || 1)) * 100, 100);
 
-  const cumulativeByCategory = useMemo(() => {
-    const totals: Record<string, { amount: number, notes: string[] }> = {};
-    transactions.forEach(t => {
-      if (!totals[t.category]) {
-        totals[t.category] = { amount: 0, notes: [] };
-      }
-      totals[t.category].amount += t.amount;
-      if (t.note && !totals[t.category].notes.includes(t.note)) {
-        totals[t.category].notes.push(t.note);
-      }
-    });
-    return Object.entries(totals).sort((a, b) => b[1].amount - a[1]);
-  }, [transactions]);
+  const formatCurrency = (val: number) => new Intl.NumberFormat(undefined, { minimumFractionDigits: 2 }).format(val);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="min-h-screen bg-slate-50 pb-24 font-['Inter']">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-emerald-600 p-2 rounded-xl shadow-lg shadow-emerald-200">
-              <Wallet className="w-5 h-5 text-white" />
-            </div>
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setActiveTab('overview')}>
+            <div className="bg-emerald-600 p-2 rounded-xl shadow-lg shadow-emerald-200"><Wallet className="w-5 h-5 text-white" /></div>
             <div>
               <h1 className="text-xl font-bold text-slate-900 leading-tight">SpendWise</h1>
-              <p className="text-[10px] text-slate-500 font-medium tracking-widest uppercase">Daily Tracker</p>
+              <p className="text-[10px] text-slate-500 font-medium tracking-widest uppercase">Wealth Engine</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={clearAll} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-              <Trash2 className="w-5 h-5" />
-            </button>
-          </div>
+          <button onClick={clearAll} className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition-all"><Trash2 className="w-5 h-5" /></button>
         </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden md:block">
-          <nav className="flex gap-8">
-            <button onClick={() => setActiveTab('overview')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-all ${activeTab === 'overview' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500'}`}>
-              <div className="flex items-center gap-2"><LayoutDashboard className="w-4 h-4" /> Financial Overview</div>
-            </button>
-            <button onClick={() => setActiveTab('income')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-all ${activeTab === 'income' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500'}`}>
-              <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Daily Income</div>
-            </button>
-            <button onClick={() => setActiveTab('manage')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-all ${activeTab === 'manage' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500'}`}>
-              <div className="flex items-center gap-2"><PlusCircle className="w-4 h-4" /> Daily Expenses</div>
-            </button>
-            <button onClick={() => setActiveTab('reports')} className={`py-4 px-1 border-b-2 font-medium text-sm transition-all ${activeTab === 'reports' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500'}`}>
-              <div className="flex items-center gap-2"><FileText className="w-4 h-4" /> Reports & Export</div>
-            </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-auto scrollbar-hide border-t border-slate-50">
+          <nav className="flex gap-6 min-w-max">
+            {[
+              { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+              { id: 'income', label: 'Income', icon: ArrowUpCircle },
+              { id: 'expenses', label: 'Expenses', icon: Zap },
+              { id: 'savings', label: 'Savings', icon: PiggyBank },
+              { id: 'budget', label: 'Budgets', icon: Target },
+              { id: 'reports', label: 'Reports', icon: FileText },
+              { id: 'settings', label: 'Settings', icon: PlusCircle }
+            ].map(tab => (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id as TabType)} 
+                className={`py-4 px-1 flex items-center gap-2 border-b-2 font-bold text-[11px] uppercase tracking-wider transition-all ${activeTab === tab.id ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400'}`}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            ))}
           </nav>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <Stats summary={summary} />
-
         {activeTab === 'overview' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {summary.openingBalance === 0 ? (
-                <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-xl shadow-blue-200 flex flex-col justify-between overflow-hidden relative min-h-[160px]">
-                  <div className="absolute -right-4 -bottom-4 opacity-10"><Wallet className="w-32 h-32" /></div>
-                  <div className="relative z-10">
-                    <h3 className="text-xl font-bold mb-1 flex items-center gap-2"><ArrowRightCircle className="w-5 h-5" /> Initial Balance</h3>
-                    <p className="text-blue-100 text-xs mb-4">Set your starting capital to begin tracking.</p>
-                  </div>
-                  <div className="flex gap-2 relative z-10">
-                    <input type="number" placeholder="Amount" value={openingInput} onChange={(e) => setOpeningInput(e.target.value)} className="w-full px-4 py-2 rounded-xl border-0 text-slate-900 focus:ring-2 focus:ring-blue-400 font-bold text-sm" />
-                    <button onClick={setInitialOpeningBalance} className="bg-white text-blue-600 px-4 py-2 rounded-xl font-bold hover:bg-blue-50 transition-all text-sm whitespace-nowrap">Save</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white border border-blue-100 rounded-2xl p-6 flex flex-col justify-between shadow-sm min-h-[160px]">
-                  <div className="flex items-center justify-between">
-                    <div className="bg-blue-100 p-2.5 rounded-xl"><CheckCircle2 className="w-6 h-6 text-blue-600" /></div>
-                    <button onClick={() => { const existing = transactions.find(t => t.category === Category.OPENING_BALANCE); if (existing) { setOpeningInput(existing.amount.toString()); removeTransaction(existing.id); } }} className="text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-all border border-blue-100 uppercase">Adjust Balance</button>
-                  </div>
-                  <div><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Current Opening Balance</span><p className="text-2xl font-black text-slate-900">Rs {summary.openingBalance.toFixed(2)}</p></div>
-                </div>
-              )}
-              <div className="bg-emerald-600 rounded-2xl p-6 text-white shadow-xl shadow-emerald-200 flex flex-col justify-between overflow-hidden relative min-h-[160px]">
-                <div className="absolute -right-4 -bottom-4 opacity-10"><TrendingUp className="w-32 h-32" /></div>
-                <div className="relative z-10">
-                  <h3 className="text-xl font-bold mb-1 flex items-center gap-2"><Plus className="w-5 h-5" /> Quick Daily Income</h3>
-                  <p className="text-emerald-100 text-xs mb-4">Earned something today? Add it here instantly.</p>
-                </div>
-                <div className="flex gap-2 relative z-10">
-                  <input type="number" placeholder="Today's Earning" value={quickIncomeInput} onChange={(e) => setQuickIncomeInput(e.target.value)} className="w-full px-4 py-2 rounded-xl border-0 text-slate-900 focus:ring-2 focus:ring-emerald-400 font-bold text-sm" />
-                  <button onClick={addQuickDailyIncome} className="bg-white text-emerald-600 px-4 py-2 rounded-xl font-bold hover:bg-emerald-50 transition-all text-sm whitespace-nowrap">Add Income</button>
-                </div>
-              </div>
-            </div>
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-emerald-600 p-3 rounded-2xl shadow-lg shadow-emerald-200"><Calendar className="w-6 h-6 text-white" /></div>
-                <div><h3 className="font-bold text-emerald-900">Today's Cumulative Progress</h3><p className="text-sm text-emerald-700">Totals for {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}</p></div>
-              </div>
-              <div className="flex gap-8">
-                <div className="text-center"><p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Today's Income</p><p className="text-xl font-black text-emerald-900">Rs {summary.todayIncome.toFixed(2)}</p></div>
-                <div className="text-center"><p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Today's Spent</p><p className="text-xl font-black text-rose-700">Rs {summary.todayExpenses.toFixed(2)}</p></div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              <div className="lg:col-span-8"><Charts transactions={transactions} /></div>
-              <div className="lg:col-span-4"><AIAssistant transactions={transactions} /></div>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">Today's Activity Breakdown</h3>
-              <div className="space-y-3">
-                {transactions.filter(t => t.date === todayStr).map(t => (
-                  <div key={t.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div className={`${CATEGORY_CONFIG[t.category].color} p-2 rounded-lg text-white scale-75`}>{CATEGORY_CONFIG[t.category].icon}</div>
-                      <div><span className="text-sm font-bold text-slate-700 block">{t.category}</span><span className="text-[10px] text-slate-400">{t.note}</span></div>
+             <Stats summary={summary} activeTab={activeTab} onTabChange={setActiveTab} />
+             
+             <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm space-y-5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-indigo-50 p-2.5 rounded-2xl"><Target className="w-6 h-6 text-indigo-600" /></div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Master Budget Utilization</h3>
+                      <p className="text-[10px] text-slate-400 font-medium uppercase tracking-[0.1em]">Monthly Performance Metric</p>
                     </div>
-                    <span className={`text-sm font-black ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-slate-900'}`}>{t.type === TransactionType.INCOME ? '+' : '-'}Rs {t.amount.toFixed(2)}</span>
                   </div>
-                ))}
-                {transactions.filter(t => t.date === todayStr).length === 0 && <p className="text-sm text-slate-400 italic py-4 text-center">No transactions for today yet.</p>}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {(activeTab === 'manage' || activeTab === 'income') && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="lg:col-span-5">
-              <TransactionForm onAdd={addTransaction} filterType={activeTab === 'income' ? TransactionType.INCOME : TransactionType.EXPENSE} />
-            </div>
-            <div className="lg:col-span-7">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <div className="flex items-center gap-2">
-                    <History className="w-5 h-5 text-slate-400" />
-                    <h3 className="text-lg font-semibold text-slate-800">{activeTab === 'income' ? 'Income History' : 'Expense History'}</h3>
-                  </div>
-                  {/* History View Toggle */}
-                  <div className="flex bg-slate-200 p-1 rounded-lg">
-                    <button onClick={() => setHistoryView('daily')} className={`p-1.5 rounded-md transition-all ${historyView === 'daily' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`} title="Daily View"><ListFilter className="w-4 h-4" /></button>
-                    <button onClick={() => setHistoryView('cumulative')} className={`p-1.5 rounded-md transition-all ${historyView === 'cumulative' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`} title="Cumulative View"><BarChart3 className="w-4 h-4" /></button>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-slate-800">Rs {formatCurrency(summary.totalExpenses)} <span className="text-slate-300 font-normal">/ {formatCurrency(summary.totalBudget)}</span></p>
                   </div>
                 </div>
+                
+                <div className="space-y-2">
+                  <div className="h-5 bg-slate-100 rounded-full overflow-hidden border border-slate-50 p-1">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-1000 ease-out ${budgetUsagePercent >= 100 ? 'bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)]' : budgetUsagePercent >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${budgetUsagePercent}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-[0.2em]">
+                    <span className={budgetUsagePercent >= 100 ? 'text-rose-600' : budgetUsagePercent >= 80 ? 'text-amber-600' : 'text-emerald-600'}>
+                      {budgetUsagePercent >= 100 ? 'Budget Exceeded' : budgetUsagePercent >= 80 ? 'Action Required' : 'Status Healthy'}
+                    </span>
+                    <span className="text-slate-500">{budgetUsagePercent.toFixed(1)}% Used</span>
+                  </div>
+                </div>
+             </div>
 
-                <div className="max-h-[700px] overflow-y-auto scrollbar-hide">
-                  {historyView === 'daily' ? (
-                    groupedTransactions.map(([date, items]) => {
-                      const filteredItems = items.filter(item => activeTab === 'income' ? item.type === TransactionType.INCOME : item.type === TransactionType.EXPENSE);
-                      if (filteredItems.length === 0) return null;
-                      const dailySum = filteredItems.reduce((sum, item) => sum + item.amount, 0);
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-8 space-y-8">
+                <Charts transactions={transactions} customCategories={customCategories} />
+                <BudgetProgress budgets={budgets} monthlySpending={monthlySpending} customCategories={customCategories} />
+              </div>
+              <div className="lg:col-span-4 space-y-8">
+                <AIAssistant transactions={transactions} />
+                <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+                   <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Today's Activity</h3>
+                    <button onClick={() => setActiveTab('expenses')} className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 hover:underline">View Ledger <ChevronRight className="w-3 h-3" /></button>
+                   </div>
+                   <div className="space-y-4">
+                    {transactions.filter(t => t.date === todayStr).slice(0, 5).map(t => {
+                      const config = getCategoryConfig(t.category, customCategories);
+                      const IconComp = ICON_MAP[config.iconName] || MoreHorizontal;
                       return (
-                        <div key={date} className="border-b border-slate-100 last:border-0">
-                          <div className="bg-slate-50 px-6 py-2 flex justify-between items-center"><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{date === todayStr ? 'Today' : date}</span><span className={`text-[10px] font-bold ${activeTab === 'income' ? 'text-emerald-600' : 'text-rose-500'}`}>DAILY {activeTab === 'income' ? 'INCOME' : 'TOTAL'}: Rs {dailySum.toFixed(2)}</span></div>
-                          <div className="divide-y divide-slate-50">
-                            {filteredItems.map((t) => (
-                              <div key={t.id} className="p-4 hover:bg-slate-50/10 transition-colors group flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  <div className={`${CATEGORY_CONFIG[t.category].color} p-2.5 rounded-xl text-white shadow-sm`}>{CATEGORY_CONFIG[t.category].icon}</div>
-                                  <div><p className="font-semibold text-slate-800 leading-tight">{t.category}</p><p className="text-xs text-slate-500 mt-1">{t.note}</p></div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                  <div className="text-right"><p className={`font-black ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-slate-800'}`}>{t.type === TransactionType.INCOME ? '+' : '-'}Rs {t.amount.toFixed(2)}</p></div>
-                                  <button onClick={() => removeTransaction(t.id)} className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-rose-500 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="divide-y divide-slate-50">
-                      {cumulativeByCategory.filter(([cat]) => activeTab === 'income' ? CATEGORY_CONFIG[cat as Category].defaultType === TransactionType.INCOME : CATEGORY_CONFIG[cat as Category].defaultType === TransactionType.EXPENSE).map(([cat, data]) => (
-                        <div key={cat} className="p-4 hover:bg-slate-50/10 transition-colors flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className={`${CATEGORY_CONFIG[cat as Category].color} p-2.5 rounded-xl text-white shadow-sm`}>{CATEGORY_CONFIG[cat as Category].icon}</div>
+                        <div key={t.id} onClick={() => { setEditingTransaction(t); setActiveTab(t.type === TransactionType.INCOME ? 'income' : 'expenses'); }} className="flex items-center justify-between py-1 cursor-pointer hover:bg-slate-50 transition-colors rounded-xl px-2 -mx-2">
+                          <div className="flex items-center gap-3">
+                            <div className={`${config.color} p-2 rounded-lg text-white scale-90 shadow-sm`}><IconComp className="w-4 h-4" /></div>
                             <div>
-                              <p className="font-semibold text-slate-800 leading-tight">{cat}</p>
-                              <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">Cumulative Total</p>
+                              <span className="text-sm font-bold text-slate-700 block">{t.category}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">{t.note.length > 20 ? t.note.substring(0, 17) + '...' : t.note}</span>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className={`text-lg font-black ${CATEGORY_CONFIG[cat as Category].defaultType === TransactionType.INCOME ? 'text-emerald-600' : 'text-slate-900'}`}>Rs {data.amount.toFixed(2)}</p>
-                            <p className="text-[10px] text-slate-400 italic">Across multiple entries</p>
-                          </div>
+                          <span className={`text-sm font-black ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-slate-900'}`}>
+                            {t.type === TransactionType.INCOME ? '+' : '-'}Rs {t.amount.toFixed(2)}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  {transactions.filter(t => activeTab === 'income' ? t.type === TransactionType.INCOME : t.type === TransactionType.EXPENSE).length === 0 && <div className="p-20 text-center text-slate-400 italic">No records found.</div>}
+                      );
+                    })}
+                    {transactions.filter(t => t.date === todayStr).length === 0 && (
+                      <div className="py-12 text-center text-slate-300 text-xs font-medium space-y-3">
+                        <Zap className="w-8 h-8 mx-auto opacity-20" />
+                        <p>No activity recorded today.</p>
+                      </div>
+                    )}
+                   </div>
                 </div>
+              </div>
+             </div>
+          </div>
+        )}
+
+        {(activeTab === 'income' || activeTab === 'expenses') && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="lg:col-span-5">
+              <TransactionForm 
+                onAdd={saveTransaction} 
+                onCancel={() => setEditingTransaction(null)} 
+                editingTransaction={editingTransaction} 
+                filterType={activeTab === 'income' ? TransactionType.INCOME : TransactionType.EXPENSE} 
+                customCategories={customCategories} 
+              />
+            </div>
+            <div className="lg:col-span-7">
+              <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full max-h-[750px]">
+                 <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+                        {activeTab === 'income' ? "Income Ledger" : "Expense Ledger"}
+                      </h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">
+                        Comprehensive Historical Log
+                      </p>
+                    </div>
+                    <div className="bg-white border border-slate-200 px-4 py-2 rounded-2xl shadow-sm">
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                         {activeTab === 'income' ? 'Total: ' : 'Spent: '} Rs {formatCurrency(activeTab === 'income' ? summary.totalIncome : summary.totalExpenses)}
+                       </span>
+                    </div>
+                 </div>
+                 <div className="overflow-auto scrollbar-hide">
+                    <table className="w-full text-left">
+                       <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                          <tr className="text-[10px] uppercase font-black tracking-widest text-slate-500">
+                             <th className="px-8 py-5">Date</th>
+                             <th className="px-8 py-5">Item Details</th>
+                             <th className="px-8 py-5 text-right">Value (Rs)</th>
+                          </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                          {transactions
+                            .filter(t => t.type === (activeTab === 'income' ? TransactionType.INCOME : TransactionType.EXPENSE))
+                            .sort((a,b) => b.date.localeCompare(a.date))
+                            .map(t => {
+                              const isToday = t.date === todayStr;
+                              return (
+                                <tr key={t.id} onClick={() => setEditingTransaction(t)} className={`hover:bg-slate-50 cursor-pointer transition-colors group ${isToday ? 'bg-emerald-50/20' : ''}`}>
+                                  <td className="px-8 py-6">
+                                    <div className="flex flex-col">
+                                      <span className="text-xs font-bold text-slate-500">{t.date}</span>
+                                      {isToday && <span className="text-[8px] font-black uppercase text-emerald-600 tracking-widest mt-0.5">Today</span>}
+                                    </div>
+                                  </td>
+                                  <td className="px-8 py-6">
+                                    <div>
+                                      <div className="font-black text-slate-800 text-sm flex items-center gap-2">
+                                        {t.category}
+                                        {t.category === 'Opening Balance' && <IndianRupee className="w-3 h-3 text-slate-400" />}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-medium italic mt-0.5">{t.note}</div>
+                                    </div>
+                                  </td>
+                                  <td className={`px-8 py-6 text-right font-mono font-black text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                    {formatCurrency(t.amount)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          {transactions.filter(t => t.type === (activeTab === 'income' ? TransactionType.INCOME : TransactionType.EXPENSE)).length === 0 && (
+                            <tr>
+                              <td colSpan={3} className="py-32 text-center">
+                                <div className="space-y-4 opacity-20">
+                                  <TrendingUp className="w-16 h-16 mx-auto" />
+                                  <p className="text-sm font-black uppercase tracking-widest">Empty Ledger</p>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                       </tbody>
+                    </table>
+                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'reports' && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <ReportView transactions={transactions} summary={summary} />
-          </div>
-        )}
+        {activeTab === 'savings' && <CompoundSavings transactions={transactions} customCategories={customCategories} onSaveTransaction={saveTransaction} onRemoveTransaction={removeTransaction} onStartEdit={(t) => { setEditingTransaction(t); setActiveTab('savings'); }} editingTransaction={editingTransaction} onCancelEdit={() => setEditingTransaction(null)} />}
+        {activeTab === 'budget' && <BudgetManager budgets={budgets} onUpdate={updateBudget} customCategories={customCategories} />}
+        {activeTab === 'reports' && <ReportView transactions={transactions} summary={summary} customCategories={customCategories} budgets={budgets} />}
+        {activeTab === 'settings' && <CategoryManager customCategories={customCategories} onAdd={addCustomCategory} onUpdate={updateCustomCategory} onDelete={deleteCustomCategory} />}
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-slate-200 px-6 py-3 flex items-center justify-around md:hidden z-50">
-        <button onClick={() => setActiveTab('overview')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'overview' ? 'text-emerald-600' : 'text-slate-400'}`}><LayoutDashboard className="w-6 h-6" /><span className="text-[10px] font-bold uppercase tracking-widest">Dash</span></button>
-        <button onClick={() => setActiveTab('income')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'income' ? 'text-emerald-600' : 'text-slate-400'}`}><TrendingUp className="w-6 h-6" /><span className="text-[10px] font-bold uppercase tracking-widest">Income</span></button>
-        <div className="relative -mt-10"><button onClick={() => setActiveTab('manage')} className={`p-4 rounded-2xl shadow-xl shadow-emerald-200 transition-all ${activeTab === 'manage' ? 'bg-emerald-600 text-white scale-110' : 'bg-slate-200 text-slate-500'}`}><PlusCircle className="w-8 h-8" /></button></div>
-        <button onClick={() => setActiveTab('reports')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'reports' ? 'text-emerald-600' : 'text-slate-400'}`}><FileText className="w-6 h-6" /><span className="text-[10px] font-bold uppercase tracking-widest">Docs</span></button>
+      {/* Mobile Floating Action Button and Simplified Bottom Nav */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-6 px-8 py-4 bg-slate-900/95 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl md:hidden">
+        <button onClick={() => setActiveTab('overview')} className={`flex flex-col items-center gap-1.5 ${activeTab === 'overview' ? 'text-emerald-400' : 'text-slate-400'}`}><LayoutDashboard className="w-5 h-5" /><span className="text-[8px] font-black uppercase tracking-wider">Dash</span></button>
+        <button onClick={() => setActiveTab('income')} className={`flex flex-col items-center gap-1.5 ${activeTab === 'income' ? 'text-emerald-400' : 'text-slate-400'}`}><ArrowUpCircle className="w-5 h-5" /><span className="text-[8px] font-black uppercase tracking-wider">Earn</span></button>
+        <button onClick={() => { setEditingTransaction(null); setActiveTab('expenses'); }} className="p-4 bg-emerald-500 rounded-2xl text-white shadow-lg shadow-emerald-500/30 -mt-12 border-4 border-slate-900 active:scale-90 transition-all"><PlusCircle className="w-7 h-7" /></button>
+        <button onClick={() => setActiveTab('expenses')} className={`flex flex-col items-center gap-1.5 ${activeTab === 'expenses' ? 'text-amber-400' : 'text-slate-400'}`}><Zap className="w-5 h-5" /><span className="text-[8px] font-black uppercase tracking-wider">Spend</span></button>
+        <button onClick={() => setActiveTab('savings')} className={`flex flex-col items-center gap-1.5 ${activeTab === 'savings' ? 'text-teal-400' : 'text-slate-400'}`}><PiggyBank className="w-5 h-5" /><span className="text-[8px] font-black uppercase tracking-wider">Wealth</span></button>
       </div>
     </div>
   );

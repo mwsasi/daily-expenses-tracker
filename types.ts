@@ -1,23 +1,19 @@
 
 export enum TransactionType {
   INCOME = 'INCOME',
-  EXPENSE = 'EXPENSE'
+  EXPENSE = 'EXPENSE',
+  SAVINGS = 'SAVINGS'
 }
 
-export enum Category {
-  OPENING_BALANCE = 'Opening Balance',
-  DAILY_INCOME = 'Daily Income',
-  FUEL = 'Fuel',
-  BIKE_REPAIR = 'Bike Repair',
-  FOOD = 'Food',
-  TEA = 'Tea',
-  MOBILE_TOPUP = 'Mobile Topup',
-  INTERNET_TOPUP = 'Internet Topup',
-  PARCEL = 'Parcel',
-  BIKE = 'Bike',
-  BUY_ACCESSORIES = 'Buy Accessories',
-  SAVINGS = 'Savings',
-  OTHERS = 'Others'
+export type Category = string;
+
+export interface CategoryConfig {
+  id: string;
+  name: string;
+  iconName: string;
+  color: string;
+  type: TransactionType;
+  isCustom?: boolean;
 }
 
 export interface Transaction {
@@ -29,10 +25,21 @@ export interface Transaction {
   note: string;
 }
 
+export interface Budget {
+  category: Category;
+  amount: number;
+}
+
 export interface DailySummary {
   openingBalance: number;
   totalIncome: number;
   totalExpenses: number;
   netSavings: number;
   currentBalance: number;
+  totalBudget: number;
+  cumulativeIncome: number;
+  totalSavings: number;
+  todayExpenses?: number;
+  todayIncome?: number;
+  todaySavings?: number;
 }
