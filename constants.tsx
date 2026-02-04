@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Fuel, 
@@ -10,7 +9,6 @@ import {
   Package, 
   Bike, 
   ShoppingBag, 
-  PiggyBank, 
   PlusCircle, 
   Wallet,
   MoreHorizontal,
@@ -43,7 +41,6 @@ export const ICON_MAP: Record<string, React.ElementType> = {
   Package, 
   Bike, 
   ShoppingBag, 
-  PiggyBank, 
   PlusCircle, 
   Wallet,
   MoreHorizontal,
@@ -76,7 +73,6 @@ export const DEFAULT_CATEGORIES: CategoryConfig[] = [
   { id: 'internet_topup', name: 'Data top up', iconName: 'Globe', color: '#6366f1', type: TransactionType.EXPENSE },
   { id: 'parcel', name: 'Parcel', iconName: 'Package', color: '#0891b2', type: TransactionType.EXPENSE },
   { id: 'buy_accessories', name: 'Buy acceries', iconName: 'ShoppingBag', color: '#f43f5e', type: TransactionType.EXPENSE },
-  { id: 'savings', name: 'Savings', iconName: 'PiggyBank', color: '#14b8a6', type: TransactionType.SAVINGS },
   { id: 'others', name: 'Others', iconName: 'MoreHorizontal', color: '#6b7280', type: TransactionType.EXPENSE },
 ];
 

@@ -23,7 +23,8 @@ export interface Transaction {
   category: Category;
   amount: number;
   note: string;
-  account?: 'Commercial Bank' | 'Amana Bank';
+  // Optional account property for tracking savings bank/account
+  account?: string;
 }
 
 export interface Budget {
@@ -35,12 +36,11 @@ export interface DailySummary {
   openingBalance: number;
   totalIncome: number;
   totalExpenses: number;
-  netSavings: number;
   currentBalance: number;
   totalBudget: number;
   cumulativeIncome: number;
-  totalSavings: number;
   todayExpenses?: number;
   todayIncome?: number;
-  todaySavings?: number;
+  // totalSavings field to track wealth reallocation
+  totalSavings: number;
 }

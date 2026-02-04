@@ -10,16 +10,14 @@ import ReportView from './components/ReportView';
 import BudgetManager from './components/BudgetManager';
 import BudgetProgress from './components/BudgetProgress';
 import CategoryManager from './components/CategoryManager';
-import CompoundSavings from './components/CompoundSavings';
 import DateDropdown, { DatePreset } from './components/DateDropdown';
-import { Trash2, Wallet, LayoutDashboard, PlusCircle, FileText, TrendingUp, Target, PiggyBank, ArrowUpCircle, MoreHorizontal, Zap, BarChart3, ChevronRight, IndianRupee, Edit3, Menu, X, Settings, ChevronDown, Building2, Landmark, Sparkles } from 'lucide-react';
+import { Trash2, Wallet, LayoutDashboard, PlusCircle, FileText, Target, ArrowUpCircle, MoreHorizontal, Zap, BarChart3, Settings, Sparkles } from 'lucide-react';
 
-type TabType = 'overview' | 'income' | 'expenses' | 'savings' | 'reports' | 'budget' | 'settings';
+type TabType = 'overview' | 'income' | 'expenses' | 'reports' | 'budget' | 'settings';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [ledgerDateFilter, setLedgerDateFilter] = useState<DatePreset>('all');
   const [preselectedCategory, setPreselectedCategory] = useState<string | null>(null);
   
@@ -69,21 +67,9 @@ const App: React.FC = () => {
   const updateCustomCategory = (updatedCat: CategoryConfig) => setCustomCategories(prev => prev.map(c => c.id === updatedCat.id ? updatedCat : c));
   const deleteCustomCategory = (id: string) => setCustomCategories(prev => prev.filter(c => c.id !== id));
 
-  const removeTransaction = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this transaction?")) {
-      setTransactions(prev => prev.filter(t => t.id !== id));
-      if (editingTransaction?.id === id) setEditingTransaction(null);
-    }
-  };
-
   const clearAll = () => { if (window.confirm("Delete all data? This cannot be undone.")) setTransactions([]); };
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const yesterdayStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  }, []);
   const currentMonthStr = useMemo(() => new Date().toISOString().substring(0, 7), []);
 
   const monthlySpending = useMemo(() => {
@@ -97,9 +83,11 @@ const App: React.FC = () => {
   }, [transactions, currentMonthStr]);
 
   const summary = useMemo(() => {
-    let opening: number = 0, income: number = 0, expenses: number = 0, currentMonthSavings: number = 0;
-    let todayExp: number = 0, todayInc: number = 0, todaySav: number = 0, liquid: number = 0;
-    let cumulativeInc: number = 0, totalSavingsAcc: number = 0;
+    let opening: number = 0, income: number = 0, expenses: number = 0;
+    let todayExp: number = 0, todayInc: number = 0, liquid: number = 0;
+    let cumulativeInc: number = 0;
+    // Calculate total savings independently
+    let savings: number = 0;
     
     transactions.forEach(t => {
       const isToday = t.date === todayStr;
@@ -108,11 +96,16 @@ const App: React.FC = () => {
       if (t.type === TransactionType.INCOME) {
         liquid += amount; cumulativeInc += amount;
         if (t.category === 'Opening Balance') opening += amount;
-      } else if (t.type === TransactionType.EXPENSE) liquid -= amount;
-      else if (t.type === TransactionType.SAVINGS) { liquid -= amount; totalSavingsAcc += amount; }
+      } else if (t.type === TransactionType.EXPENSE) {
+        liquid -= amount;
+      } else if (t.type === TransactionType.SAVINGS) {
+        // Move money from liquid pool to savings pool
+        liquid -= amount;
+        savings += amount;
+      }
+      
       if (isCurrentMonth) {
-        if (t.type === TransactionType.SAVINGS) { currentMonthSavings += amount; if (isToday) todaySav += amount; }
-        else if (t.type === TransactionType.INCOME && t.category !== 'Opening Balance') { income += amount; if (isToday) todayInc += amount; }
+        if (t.type === TransactionType.INCOME && t.category !== 'Opening Balance') { income += amount; if (isToday) todayInc += amount; }
         else if (t.type === TransactionType.EXPENSE) { expenses += amount; if (isToday) todayExp += amount; }
       } else if (isToday) {
         if (t.type === TransactionType.INCOME && t.category !== 'Opening Balance') todayInc += amount;
@@ -121,19 +114,21 @@ const App: React.FC = () => {
     });
 
     const totalBudgetValue = (Object.values(budgets) as number[]).reduce((sum: number, val: number) => sum + (Number(val) || 0), 0);
-    return { openingBalance: opening, totalIncome: income, totalExpenses: expenses, netSavings: currentMonthSavings, totalSavings: totalSavingsAcc, todaySavings: todaySav, currentBalance: liquid, todayExpenses: todayExp, todayIncome: todayInc, cumulativeIncome: cumulativeInc, totalBudget: totalBudgetValue };
+    return { 
+      openingBalance: opening, 
+      totalIncome: income, 
+      totalExpenses: expenses, 
+      currentBalance: liquid, 
+      todayExpenses: todayExp, 
+      todayIncome: todayInc, 
+      cumulativeIncome: cumulativeInc, 
+      totalBudget: totalBudgetValue,
+      totalSavings: savings
+    };
   }, [transactions, todayStr, currentMonthStr, budgets]);
 
   const budgetUsagePercent = Math.min((summary.totalExpenses / (summary.totalBudget || 1)) * 100, 100);
   const formatCurrency = (val: number) => new Intl.NumberFormat(undefined, { minimumFractionDigits: 2 }).format(val);
-
-  const handleStartEdit = (t: Transaction) => {
-    setEditingTransaction(t);
-    if (t.type === TransactionType.INCOME) setActiveTab('income');
-    else if (t.type === TransactionType.EXPENSE) setActiveTab('expenses');
-    else if (t.type === TransactionType.SAVINGS) setActiveTab('savings');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const handleQuickAdd = (categoryName: string) => {
     setPreselectedCategory(categoryName);
@@ -147,7 +142,6 @@ const App: React.FC = () => {
     { id: 'overview', label: 'overview', icon: LayoutDashboard },
     { id: 'income', label: 'income', icon: ArrowUpCircle },
     { id: 'expenses', label: 'expenses', icon: Zap },
-    { id: 'savings', label: 'savings', icon: PiggyBank },
     { id: 'budget', label: 'budgets', icon: Target },
     { id: 'reports', label: 'reports', icon: FileText },
     { id: 'settings', label: 'settings', icon: Settings }
@@ -170,7 +164,7 @@ const App: React.FC = () => {
           <div className="overflow-x-auto scrollbar-hide">
             <nav className="flex gap-4 md:gap-8 min-w-max">
               {navItems.map(tab => (
-                <button key={tab.id} onClick={() => { setActiveTab(tab.id as TabType); setEditingTransaction(null); setIsMobileMenuOpen(false); setPreselectedCategory(null); }} className={`py-2 md:py-4 px-1 flex items-center gap-1.5 border-b-2 font-black text-[10px] md:text-[12px] lowercase tracking-wide transition-all active:scale-95 ${activeTab === tab.id ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400'}`}>
+                <button key={tab.id} onClick={() => { setActiveTab(tab.id as TabType); setEditingTransaction(null); setPreselectedCategory(null); }} className={`py-2 md:py-4 px-1 flex items-center gap-1.5 border-b-2 font-black text-[10px] md:text-[12px] lowercase tracking-wide transition-all active:scale-95 ${activeTab === tab.id ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400'}`}>
                   <tab.icon className="w-3 h-3 md:w-3.5 md:h-3.5" />{tab.label}
                 </button>
               ))}
@@ -260,7 +254,6 @@ const App: React.FC = () => {
             <div className="lg:col-span-7"><div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm lowercase">income history view</div></div>
           </div>
         )}
-        {activeTab === 'savings' && <CompoundSavings transactions={transactions} customCategories={customCategories} onSaveTransaction={saveTransaction} onRemoveTransaction={removeTransaction} onStartEdit={handleStartEdit} editingTransaction={editingTransaction} onCancelEdit={() => setEditingTransaction(null)} />}
         {activeTab === 'budget' && <BudgetManager budgets={budgets} onUpdate={updateBudget} customCategories={customCategories} />}
         {activeTab === 'reports' && <ReportView transactions={transactions} summary={summary} customCategories={customCategories} budgets={budgets} />}
         {activeTab === 'settings' && <CategoryManager customCategories={customCategories} onAdd={addCustomCategory} onUpdate={updateCustomCategory} onDelete={deleteCustomCategory} />}

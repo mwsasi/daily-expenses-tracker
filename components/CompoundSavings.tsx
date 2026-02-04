@@ -35,7 +35,7 @@ interface CompoundSavingsProps {
   onRemoveTransaction: (id: string) => void;
   onStartEdit: (t: Transaction) => void;
   editingTransaction: Transaction | null;
-  onCancelEdit: void;
+  onCancelEdit: () => void;
 }
 
 type BankFilter = 'all' | 'Commercial Bank' | 'Amana Bank';
