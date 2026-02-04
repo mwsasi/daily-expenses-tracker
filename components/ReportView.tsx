@@ -52,7 +52,6 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransactionType>('ALL');
 
-  // Handle preset calculations
   useEffect(() => {
     const now = new Date();
     let start = '';
@@ -90,40 +89,15 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
         end = todayStr;
         break;
       case 'custom':
-        // Don't override if user is setting custom dates
         return;
     }
 
-    // FIXED: Removed redundant 'if (datePreset !== "custom")' check.
-    // TypeScript correctly identifies that 'datePreset' cannot be 'custom' here 
-    // due to the early return in the switch statement for that case.
     setStartDate(start);
     setEndDate(end);
   }, [datePreset, todayStr]);
 
-  const tailwindColorToHex = (colorName: string) => {
-    const map: Record<string, string> = {
-      'blue-500': '#3b82f6',
-      'emerald-500': '#10b981',
-      'orange-500': '#f97316',
-      'red-500': '#ef4444',
-      'amber-600': '#d97706',
-      'yellow-600': '#ca8a04',
-      'purple-500': '#a855f7',
-      'indigo-500': '#6366f1',
-      'cyan-600': '#0891b2',
-      'slate-700': '#334155',
-      'rose-500': '#f43f5e',
-      'teal-500': '#14b8a6',
-      'gray-500': '#6b7280',
-      'pink-500': '#ec4899',
-      'violet-600': '#7c3aed',
-    };
-    return map[colorName.replace('bg-', '')] || '#64748b';
-  };
-
-  const escapeXML = (str: string) => {
-    if (!str) return '';
+  const escapeXML = (str: any) => {
+    if (str === null || str === undefined) return '';
     return str.toString()
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -132,7 +106,10 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
       .replace(/'/g, '&apos;');
   };
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat(undefined, { minimumFractionDigits: 2 }).format(val);
+  const formatCurrency = (val: number) => new Intl.NumberFormat(undefined, { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  }).format(val);
 
   const periodTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -158,19 +135,19 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   }, [periodTransactions]);
 
   const ledgerData = useMemo(() => {
-    const allDates = Array.from(new Set(transactions.map(t => t.date))).sort();
+    const allDates: string[] = Array.from(new Set(transactions.map(t => t.date))).sort() as string[];
     const ledgerMap: Record<string, any> = {};
     let runningBalance = 0;
 
-    allDates.forEach(date => {
+    allDates.forEach((date: string) => {
       const dayTxs = transactions.filter(t => t.date === date);
-      const dayOpening = dayTxs.filter(t => t.category === 'Opening Balance').reduce((sum, t) => sum + t.amount, 0);
-      const dayIncome = dayTxs.filter(t => t.type === TransactionType.INCOME && t.category !== 'Opening Balance').reduce((sum, t) => sum + t.amount, 0);
-      const dayExpenses = dayTxs.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
-      const daySavings = dayTxs.filter(t => t.type === TransactionType.SAVINGS).reduce((sum, t) => sum + t.amount, 0);
+      const dayOpening = dayTxs.filter(t => t.category === 'Opening Balance').reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+      const dayIncome = dayTxs.filter(t => t.type === TransactionType.INCOME && t.category !== 'Opening Balance').reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+      const dayExpenses = dayTxs.filter(t => t.type === TransactionType.EXPENSE).reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+      const daySavings = dayTxs.filter(t => t.type === TransactionType.SAVINGS).reduce((sum: number, t: Transaction) => sum + t.amount, 0);
       
       const catBreakdown: Record<string, number> = {};
-      dayTxs.forEach(t => {
+      dayTxs.forEach((t: Transaction) => {
         catBreakdown[t.category] = (catBreakdown[t.category] || 0) + t.amount;
       });
 
@@ -211,7 +188,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
       .map(([name, data]) => ({
         name,
         amount: data.amount,
-        color: data.color // Directly use HEX color
+        color: data.color 
       }))
       .sort((a, b) => b.amount - a.amount);
   }, [periodTransactions, customCategories]);
@@ -219,31 +196,25 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   const generatePDFSummary = () => {
     const doc = new jsPDF();
     const periodLabel = datePreset === 'custom' ? `${startDate} to ${endDate}` : datePreset;
-    
     doc.setFillColor(5, 150, 105); 
     doc.rect(0, 0, 210, 40, 'F');
-    
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
     doc.setTextColor(255, 255, 255);
     doc.text('SpendWise Financial Summary', 15, 25);
-    
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated on ${new Date().toLocaleDateString()}`, 150, 25);
-
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text(`Reporting Period: ${periodLabel}`, 15, 55);
-
     doc.setDrawColor(226, 232, 240);
     doc.line(15, 60, 195, 60);
 
     const startY = 75;
     const lineHeight = 12;
-
-    const metrics = [
+    const metrics: Array<{label: string, value: number, color: number[]}> = [
       { label: 'Total Period Income', value: fullPeriodSummary.income, color: [5, 150, 105] },
       { label: 'Total Period Expenses', value: fullPeriodSummary.expense, color: [244, 63, 94] },
       { label: 'Total Period Savings', value: fullPeriodSummary.savings, color: [20, 184, 166] },
@@ -257,11 +228,9 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
       doc.setFontSize(11);
       doc.setTextColor(71, 85, 105);
       doc.text(m.label, 20, currentY);
-      
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(m.color[0], m.color[1], m.color[2]);
       doc.text(`RS ${formatCurrency(m.value)}`, 140, currentY);
-      
       doc.setDrawColor(241, 245, 249);
       doc.line(20, currentY + 3, 190, currentY + 3);
     });
@@ -270,23 +239,22 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     doc.setFontSize(9);
     doc.setTextColor(148, 163, 184);
     doc.text('Report produced by SpendWise Daily Expense Tracker.', 15, 280);
-
     doc.save(`SpendWise_Summary_${startDate.replace(/-/g, '_')}.pdf`);
   };
 
   const generateExcelXML = () => {
-    const periodLabel = `${startDate}_to_${endDate}`;
-    const allUsedCats = Array.from(new Set(periodTransactions.map(t => t.category))).sort();
+    const periodLabel = escapeXML(`${startDate} to ${endDate}`);
+    const allUsedCats: string[] = Array.from(new Set(periodTransactions.map((t: Transaction) => t.category))).sort() as string[];
     
-    const priorityCategories = ['Opening Balance', 'Daily Income', 'Savings'];
-    const otherCategories = allUsedCats.filter(cat => !priorityCategories.includes(cat));
-    const finalMatrixCats = [
-      ...priorityCategories.filter(cat => allUsedCats.includes(cat)),
+    const priorityCategories: string[] = ['Opening Balance', 'Daily Income', 'Savings'];
+    const otherCategories: string[] = allUsedCats.filter((cat: string) => !priorityCategories.includes(cat));
+    const finalMatrixCats: string[] = [
+      ...priorityCategories.filter((cat: string) => allUsedCats.includes(cat)),
       ...otherCategories
     ];
     
     const columnTotals: Record<string, number> = {};
-    finalMatrixCats.forEach(cat => {
+    finalMatrixCats.forEach((cat: string) => {
       columnTotals[cat] = periodTransactions.filter(t => t.category === cat).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     });
 
@@ -311,19 +279,17 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
    </Borders>
   </Style>
   <Style ss:ID="TotalStyle">
    <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#1E293B"/>
    <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
-  </Style>
-  <Style ss:ID="CurrencyStyle">
-   <NumberFormat ss:Format="&quot;RS&quot;\ #,##0.00"/>
-  </Style>
-  <Style ss:ID="TotalCurrencyStyle">
-   <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#1E293B"/>
-   <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
-   <NumberFormat ss:Format="&quot;RS&quot;\ #,##0.00"/>
+   <Borders>
+    <Border ss:Position="Top" ss:LineStyle="Double" ss:Weight="3"/>
+   </Borders>
   </Style>
   <Style ss:ID="BoldLabel">
    <Font ss:FontName="Segoe UI" ss:Bold="1"/>
@@ -340,10 +306,10 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Metric</Data></Cell>
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Value (RS)</Data></Cell>
    </Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Gross Monthly Income</Data></Cell><Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${fullPeriodSummary.income}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Operational Expenses</Data></Cell><Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${fullPeriodSummary.expense}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Wealth Reallocation (Savings)</Data></Cell><Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${fullPeriodSummary.savings}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Closing Total Wealth</Data></Cell><Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${summary.currentBalance + summary.totalSavings}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Gross Monthly Income</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.income)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Operational Expenses</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.expense)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Wealth Reallocation (Savings)</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.savings)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Closing Total Wealth</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(summary.currentBalance + summary.totalSavings)}</Data></Cell></Row>
   </Table>
  </Worksheet>
 
@@ -351,38 +317,41 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   <Table ss:DefaultColumnWidth="120">
    <Row ss:Height="25">
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Date</Data></Cell>
-    ${finalMatrixCats.map(cat => `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXML(cat)}</Data></Cell>`).join('')}
+    ${finalMatrixCats.map((cat: string) => `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXML(cat)}</Data></Cell>`).join('')}
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Liquid Position</Data></Cell>
    </Row>`;
 
-    ledgerData.forEach(day => {
-      xml += `<Row>
-    <Cell ss:StyleID="CenterText"><Data ss:Type="String">${day.date}</Data></Cell>
-    ${finalMatrixCats.map(cat => {
+    ledgerData.forEach((day: any) => {
+      xml += `
+   <Row>
+    <Cell ss:StyleID="CenterText"><Data ss:Type="String">${escapeXML(day.date)}</Data></Cell>
+    ${finalMatrixCats.map((cat: string) => {
       const amt = day.categories[cat] || 0;
-      return `<Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${amt}</Data></Cell>`;
+      return `<Cell><Data ss:Type="String">RS ${formatCurrency(amt)}</Data></Cell>`;
     }).join('')}
-    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${day.available}</Data></Cell>
+    <Cell><Data ss:Type="String">RS ${formatCurrency(day.available)}</Data></Cell>
    </Row>`;
     });
 
     if (ledgerData.length > 0) {
-      xml += `<Row ss:Height="25">
+      xml += `
+   <Row ss:Height="25">
     <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">GRAND TOTAL</Data></Cell>
-    ${finalMatrixCats.map(cat => `<Cell ss:StyleID="TotalCurrencyStyle"><Data ss:Type="Number">${columnTotals[cat] || 0}</Data></Cell>`).join('')}
-    <Cell ss:StyleID="TotalCurrencyStyle"><Data ss:Type="Number">${ledgerData[ledgerData.length - 1]?.available || 0}</Data></Cell>
+    ${finalMatrixCats.map((cat: string) => `<Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS ${formatCurrency(columnTotals[cat] || 0)}</Data></Cell>`).join('')}
+    <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS ${formatCurrency(ledgerData[ledgerData.length - 1]?.available || 0)}</Data></Cell>
    </Row>`;
     }
 
-    xml += `</Table>
+    xml += `
+  </Table>
  </Worksheet>
 </Workbook>`;
 
-    const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const blob = new Blob([xml], { type: 'text/xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `SpendWise_Full_Report_${periodLabel.replace(/-/g, '_')}.xls`;
+    link.download = `SpendWise_Report_${startDate.replace(/-/g, '_')}_to_${endDate.replace(/-/g, '_')}.xls`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -592,7 +561,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-xs">
-              {periodTransactions.slice().reverse().map((row) => (
+              {periodTransactions.slice().reverse().map((row: Transaction) => (
                 <tr key={row.id} className="hover:bg-slate-50/80 transition-colors group">
                   <td className="px-8 py-5 font-bold text-slate-400 group-hover:text-slate-800 transition-colors">{row.date}</td>
                   <td className="px-8 py-5 font-black text-slate-800 uppercase tracking-tight lowercase">{row.category}</td>

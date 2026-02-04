@@ -16,7 +16,7 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
   const expenseData = transactions
     .filter(t => t.type === TransactionType.EXPENSE)
     .reduce((acc, curr) => {
-      const existing = acc.find(item => item.name === curr.category);
+      const existing = acc.find((item: any) => item.name === curr.category);
       const config = getCategoryConfig(curr.category, customCategories);
       if (existing) {
         existing.value += curr.amount;
@@ -31,8 +31,9 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
     }, [] as any[]);
 
   // Prepare data for Budget vs Spending Chart
-  const budgetVsSpendingData = Object.entries(budgets)
-    .filter(([_, limit]) => limit > 0)
+  // Fixed: Added explicit type cast and type guard for budgets entries
+  const budgetVsSpendingData = Object.entries(budgets as Record<string, number>)
+    .filter((entry): entry is [string, number] => entry[1] > 0)
     .map(([catName, limit]) => {
       const spent = transactions
         .filter(t => t.category === catName && t.type === TransactionType.EXPENSE && t.date.startsWith(currentMonthStr))
@@ -40,11 +41,12 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
       return {
         name: catName.length > 10 ? catName.substring(0, 8) + '..' : catName,
         fullName: catName,
-        Budget: limit,
+        Budget: limit as number,
         Spent: spent
       };
     })
-    .sort((a, b) => (b.Spent / b.Budget) - (a.Spent / a.Budget));
+    // Fixed: Added type safety for arithmetic operation
+    .sort((a, b) => (b.Spent / (b.Budget || 1)) - (a.Spent / (a.Budget || 1)));
 
   const formatYAxis = (tickItem: number) => `RS ${tickItem}`;
 
@@ -73,7 +75,7 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {expenseData.map((entry, index) => (
+                  {expenseData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>

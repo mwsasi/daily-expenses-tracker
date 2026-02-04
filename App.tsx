@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Transaction, TransactionType, Category, DailySummary, Budget, CategoryConfig } from './types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Transaction, TransactionType, Category, DailySummary, CategoryConfig } from './types';
 import { DEFAULT_CATEGORIES, getCategoryConfig, ICON_MAP } from './constants';
 import TransactionForm from './components/TransactionForm';
 import Stats from './components/Stats';
@@ -12,7 +12,7 @@ import BudgetProgress from './components/BudgetProgress';
 import CategoryManager from './components/CategoryManager';
 import CompoundSavings from './components/CompoundSavings';
 import DateDropdown, { DatePreset } from './components/DateDropdown';
-import { Trash2, Wallet, LayoutDashboard, PlusCircle, FileText, TrendingUp, Target, PiggyBank, ArrowUpCircle, MoreHorizontal, Zap, BarChart3, ChevronRight, IndianRupee, Edit3, Menu, X, Settings, ChevronDown } from 'lucide-react';
+import { Trash2, Wallet, LayoutDashboard, PlusCircle, FileText, TrendingUp, Target, PiggyBank, ArrowUpCircle, MoreHorizontal, Zap, BarChart3, ChevronRight, IndianRupee, Edit3, Menu, X, Settings, ChevronDown, Building2, Landmark, Sparkles } from 'lucide-react';
 
 type TabType = 'overview' | 'income' | 'expenses' | 'savings' | 'reports' | 'budget' | 'settings';
 
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [ledgerDateFilter, setLedgerDateFilter] = useState<DatePreset>('all');
+  const [preselectedCategory, setPreselectedCategory] = useState<string | null>(null);
   
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('spendwise_transactions');
@@ -57,6 +58,7 @@ const App: React.FC = () => {
       }
       return [newTransaction, ...prev];
     });
+    setPreselectedCategory(null);
   };
 
   const updateBudget = (category: Category, amount: number) => {
@@ -134,7 +136,16 @@ const App: React.FC = () => {
   }, [transactions, currentMonthStr]);
 
   const summary = useMemo(() => {
-    let opening = 0, income = 0, expenses = 0, currentMonthSavings = 0, todayExp = 0, todayInc = 0, todaySav = 0, liquid = 0, cumulativeInc = 0, totalSavingsAcc = 0;
+    let opening: number = 0;
+    let income: number = 0;
+    let expenses: number = 0;
+    let currentMonthSavings: number = 0;
+    let todayExp: number = 0;
+    let todayInc: number = 0;
+    let todaySav: number = 0;
+    let liquid: number = 0;
+    let cumulativeInc: number = 0;
+    let totalSavingsAcc: number = 0;
     
     transactions.forEach(t => {
       const isToday = t.date === todayStr;
@@ -169,7 +180,7 @@ const App: React.FC = () => {
       }
     });
 
-    const totalBudgetValue = Object.values(budgets).reduce((sum, val) => sum + (val || 0), 0);
+    const totalBudgetValue = (Object.values(budgets) as number[]).reduce((sum: number, val: number) => sum + (Number(val) || 0), 0);
 
     return {
       openingBalance: opening,
@@ -197,6 +208,19 @@ const App: React.FC = () => {
     else if (t.type === TransactionType.SAVINGS) setActiveTab('savings');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const handleQuickAdd = (categoryName: string) => {
+    setPreselectedCategory(categoryName);
+    setEditingTransaction(null);
+    const formEl = document.getElementById('transaction-form');
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const quickExpenseCategories = [
+    'Food', 'Fuel', 'Bike repair', 'Parcel', 'Mobile Tp up', 'Data top up', 'Tea', 'Buy acceries', 'Others'
+  ];
 
   const navItems = [
     { id: 'overview', label: 'overview', icon: LayoutDashboard },
@@ -228,7 +252,7 @@ const App: React.FC = () => {
               {navItems.map(tab => (
                 <button 
                   key={tab.id} 
-                  onClick={() => { setActiveTab(tab.id as TabType); setEditingTransaction(null); setIsMobileMenuOpen(false); }} 
+                  onClick={() => { setActiveTab(tab.id as TabType); setEditingTransaction(null); setIsMobileMenuOpen(false); setPreselectedCategory(null); }} 
                   className={`py-2 md:py-4 px-1 flex items-center gap-1.5 border-b-2 font-black text-[10px] md:text-[12px] lowercase tracking-wide transition-all active:scale-95 ${activeTab === tab.id ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400'}`}
                 >
                   <tab.icon className="w-3 h-3 md:w-3.5 md:h-3.5" />
@@ -325,38 +349,138 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {(activeTab === 'income' || activeTab === 'expenses') && (
+        {activeTab === 'expenses' && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            {/* Quick Expense Buttons Dashboard */}
+            <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] lowercase">quick expense entry</h3>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-4">
+                {quickExpenseCategories.map(catName => {
+                  const config = getCategoryConfig(catName, customCategories);
+                  const IconComp = ICON_MAP[config.iconName] || MoreHorizontal;
+                  return (
+                    <button
+                      key={catName}
+                      onClick={() => handleQuickAdd(catName)}
+                      className="flex flex-col items-center gap-2 group active:scale-90 transition-all"
+                    >
+                      <div 
+                        style={{ backgroundColor: config.color }} 
+                        className="w-14 h-14 md:w-16 md:h-16 rounded-[1.25rem] flex items-center justify-center text-white shadow-lg shadow-slate-100 group-hover:shadow-xl group-hover:-translate-y-1 transition-all"
+                      >
+                        <IconComp className="w-6 h-6 md:w-7 md:h-7" />
+                      </div>
+                      <span className="text-[10px] font-black text-slate-600 lowercase text-center leading-tight">
+                        {catName}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-8">
+              <div className="lg:col-span-5">
+                <TransactionForm 
+                  onAdd={saveTransaction} 
+                  onCancel={() => { setEditingTransaction(null); setPreselectedCategory(null); }} 
+                  editingTransaction={editingTransaction} 
+                  filterType={TransactionType.EXPENSE} 
+                  customCategories={customCategories} 
+                  preselectedCategory={preselectedCategory}
+                />
+              </div>
+              <div className="lg:col-span-7">
+                <div className="bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full max-h-[450px] md:max-h-[750px]">
+                   <div className="p-4 md:p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-3">
+                      <div>
+                        <h3 className="text-lg md:text-2xl font-black text-slate-800 tracking-tight lowercase">expense ledger</h3>
+                        <p className="text-[9px] md:text-[10px] text-slate-400 font-bold lowercase tracking-widest mt-0.5 md:mt-1">comprehensive historical log</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <DateDropdown value={ledgerDateFilter} onChange={setLedgerDateFilter} />
+                        <div className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm h-[40px] flex items-center">
+                           <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">RS {formatCurrency(summary.totalExpenses)}</span>
+                        </div>
+                      </div>
+                   </div>
+                   <div className="overflow-auto scrollbar-hide">
+                      <table className="w-full text-left border-collapse">
+                         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                            <tr className="text-[9px] md:text-[10px] font-black tracking-widest text-slate-500 lowercase">
+                               <th className="px-4 md:px-8 py-3 md:py-5">date</th>
+                               <th className="px-4 md:px-8 py-3 md:py-5">details</th>
+                               <th className="px-4 md:px-8 py-3 md:py-5 text-right">value</th>
+                               <th className="px-4 md:px-8 py-3 md:py-5 text-center">actions</th>
+                            </tr>
+                         </thead>
+                         <tbody className="divide-y divide-slate-100">
+                            {transactions
+                              .filter(t => {
+                                const matchesType = t.type === TransactionType.EXPENSE;
+                                if (!matchesType) return false;
+                                if (ledgerDateFilter === 'today') return t.date === todayStr;
+                                if (ledgerDateFilter === 'yesterday') return t.date === yesterdayStr;
+                                if (ledgerDateFilter === 'thisMonth') return t.date.startsWith(currentMonthStr);
+                                if (ledgerDateFilter === 'last7') {
+                                  const last7 = new Date();
+                                  last7.setDate(last7.getDate() - 7);
+                                  return t.date >= last7.toISOString().split('T')[0];
+                                }
+                                return true;
+                              })
+                              .sort((a,b) => b.date.localeCompare(a.date))
+                              .map(t => (
+                                <tr key={t.id} className={`hover:bg-slate-50 transition-colors group ${t.date === todayStr ? 'bg-emerald-50/20' : ''} ${editingTransaction?.id === t.id ? 'bg-emerald-50 ring-2 ring-emerald-500 ring-inset' : ''}`}>
+                                  <td className="px-4 md:px-8 py-3 md:py-6">
+                                    <div className="flex flex-col">
+                                      <span className="text-[9px] md:text-xs font-bold text-slate-500">{t.date}</span>
+                                      {t.date === todayStr && <span className="text-[7px] font-black lowercase text-emerald-600 tracking-widest mt-0.5">today</span>}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 md:px-8 py-3 md:py-6">
+                                    <div>
+                                      <div className="font-black text-slate-800 text-[11px] md:text-sm flex items-center gap-1.5 md:gap-2 lowercase">{t.category}</div>
+                                      <div className="text-[8px] md:text-[10px] text-slate-400 font-bold italic mt-0.5 lowercase">{t.note}</div>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 md:px-8 py-3 md:py-6 text-right font-mono font-black text-[11px] md:text-sm text-slate-900">{formatCurrency(t.amount)}</td>
+                                  <td className="px-4 md:px-8 py-3 md:py-6 text-center">
+                                    <div className="flex items-center justify-center gap-1 md:gap-1.5">
+                                      <button onClick={() => handleStartEdit(t)} className="p-1 md:p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all active:scale-90"><Edit3 className="w-3 md:w-4 md:h-4" /></button>
+                                      <button onClick={() => removeTransaction(t.id)} className="p-1 md:p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all active:scale-90"><Trash2 className="w-3 md:w-4 md:h-4" /></button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                         </tbody>
+                      </table>
+                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'income' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="lg:col-span-5">
-              <TransactionForm 
-                onAdd={saveTransaction} 
-                onCancel={() => setEditingTransaction(null)} 
-                editingTransaction={editingTransaction} 
-                filterType={activeTab === 'income' ? TransactionType.INCOME : TransactionType.EXPENSE} 
-                customCategories={customCategories} 
-              />
+              <TransactionForm onAdd={saveTransaction} onCancel={() => setEditingTransaction(null)} editingTransaction={editingTransaction} filterType={TransactionType.INCOME} customCategories={customCategories} />
             </div>
             <div className="lg:col-span-7">
               <div className="bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full max-h-[450px] md:max-h-[750px]">
                  <div className="p-4 md:p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-3">
                     <div>
-                      <h3 className="text-lg md:text-2xl font-black text-slate-800 tracking-tight lowercase">
-                        {activeTab === 'income' ? "income ledger" : "expense ledger"}
-                      </h3>
-                      <p className="text-[9px] md:text-[10px] text-slate-400 font-bold lowercase tracking-widest mt-0.5 md:mt-1">
-                        comprehensive historical log
-                      </p>
+                      <h3 className="text-lg md:text-2xl font-black text-slate-800 tracking-tight lowercase">income ledger</h3>
+                      <p className="text-[9px] md:text-[10px] text-slate-400 font-bold lowercase tracking-widest mt-0.5 md:mt-1">comprehensive historical log</p>
                     </div>
-                    
                     <div className="flex items-center gap-2">
-                      <DateDropdown 
-                        value={ledgerDateFilter}
-                        onChange={setLedgerDateFilter}
-                      />
+                      <DateDropdown value={ledgerDateFilter} onChange={setLedgerDateFilter} />
                       <div className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm h-[40px] flex items-center">
-                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
-                           RS {formatCurrency(activeTab === 'income' ? summary.totalIncome : summary.totalExpenses)}
-                         </span>
+                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">RS {formatCurrency(summary.totalIncome)}</span>
                       </div>
                     </div>
                  </div>
@@ -373,9 +497,8 @@ const App: React.FC = () => {
                        <tbody className="divide-y divide-slate-100">
                           {transactions
                             .filter(t => {
-                              const matchesType = t.type === (activeTab === 'income' ? TransactionType.INCOME : TransactionType.EXPENSE);
+                              const matchesType = t.type === TransactionType.INCOME;
                               if (!matchesType) return false;
-                              
                               if (ledgerDateFilter === 'today') return t.date === todayStr;
                               if (ledgerDateFilter === 'yesterday') return t.date === yesterdayStr;
                               if (ledgerDateFilter === 'thisMonth') return t.date.startsWith(currentMonthStr);
@@ -384,51 +507,32 @@ const App: React.FC = () => {
                                 last7.setDate(last7.getDate() - 7);
                                 return t.date >= last7.toISOString().split('T')[0];
                               }
-                              
                               return true;
                             })
                             .sort((a,b) => b.date.localeCompare(a.date))
-                            .map(t => {
-                              const isToday = t.date === todayStr;
-                              return (
-                                <tr key={t.id} className={`hover:bg-slate-50 transition-colors group ${isToday ? 'bg-emerald-50/20' : ''} ${editingTransaction?.id === t.id ? 'bg-emerald-50 ring-2 ring-emerald-500 ring-inset' : ''}`}>
-                                  <td className="px-4 md:px-8 py-3 md:py-6">
-                                    <div className="flex flex-col">
-                                      <span className="text-[9px] md:text-xs font-bold text-slate-500">{t.date}</span>
-                                      {isToday && <span className="text-[7px] font-black lowercase text-emerald-600 tracking-widest mt-0.5">today</span>}
-                                    </div>
-                                  </td>
-                                  <td className="px-4 md:px-8 py-3 md:py-6">
-                                    <div>
-                                      <div className="font-black text-slate-800 text-[11px] md:text-sm flex items-center gap-1.5 md:gap-2 lowercase">
-                                        {t.category}
-                                        {t.category === 'Opening Balance' && <IndianRupee className="w-2.5 h-2.5 md:w-3 md:h-3 text-slate-400" />}
-                                      </div>
-                                      <div className="text-[8px] md:text-[10px] text-slate-400 font-bold italic mt-0.5 lowercase">{t.note}</div>
-                                    </div>
-                                  </td>
-                                  <td className={`px-4 md:px-8 py-3 md:py-6 text-right font-mono font-black text-[11px] md:text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-slate-900'}`}>
-                                    {formatCurrency(t.amount)}
-                                  </td>
-                                  <td className="px-4 md:px-8 py-3 md:py-6 text-center">
-                                    <div className="flex items-center justify-center gap-1 md:gap-1.5">
-                                      <button 
-                                        onClick={() => handleStartEdit(t)} 
-                                        className="p-1 md:p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all active:scale-90"
-                                      >
-                                        <Edit3 className="w-3 md:w-4 md:h-4" />
-                                      </button>
-                                      <button 
-                                        onClick={() => removeTransaction(t.id)} 
-                                        className="p-1 md:p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all active:scale-90"
-                                      >
-                                        <Trash2 className="w-3 md:w-4 md:h-4" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
+                            .map(t => (
+                              <tr key={t.id} className={`hover:bg-slate-50 transition-colors group ${t.date === todayStr ? 'bg-emerald-50/20' : ''} ${editingTransaction?.id === t.id ? 'bg-emerald-50 ring-2 ring-emerald-500 ring-inset' : ''}`}>
+                                <td className="px-4 md:px-8 py-3 md:py-6">
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] md:text-xs font-bold text-slate-500">{t.date}</span>
+                                    {t.date === todayStr && <span className="text-[7px] font-black lowercase text-emerald-600 tracking-widest mt-0.5">today</span>}
+                                  </div>
+                                </td>
+                                <td className="px-4 md:px-8 py-3 md:py-6">
+                                  <div>
+                                    <div className="font-black text-slate-800 text-[11px] md:text-sm flex items-center gap-1.5 md:gap-2 lowercase">{t.category}{t.category === 'Opening Balance' && <IndianRupee className="w-2.5 h-2.5 md:w-3 md:h-3 text-slate-400" />}</div>
+                                    <div className="text-[8px] md:text-[10px] text-slate-400 font-bold italic mt-0.5 lowercase">{t.note}</div>
+                                  </div>
+                                </td>
+                                <td className="px-4 md:px-8 py-3 md:py-6 text-right font-mono font-black text-[11px] md:text-sm text-emerald-600">{formatCurrency(t.amount)}</td>
+                                <td className="px-4 md:px-8 py-3 md:py-6 text-center">
+                                  <div className="flex items-center justify-center gap-1 md:gap-1.5">
+                                    <button onClick={() => handleStartEdit(t)} className="p-1 md:p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all active:scale-90"><Edit3 className="w-3 md:w-4 md:h-4" /></button>
+                                    <button onClick={() => removeTransaction(t.id)} className="p-1 md:p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all active:scale-90"><Trash2 className="w-3 md:w-4 md:h-4" /></button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
                        </tbody>
                     </table>
                  </div>
@@ -443,7 +547,6 @@ const App: React.FC = () => {
         {activeTab === 'settings' && <CategoryManager customCategories={customCategories} onAdd={addCustomCategory} onUpdate={updateCustomCategory} onDelete={deleteCustomCategory} />}
       </main>
 
-      {/* Mobile Quick Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200 md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
            <div className="absolute bottom-28 left-1/2 -translate-x-1/2 w-[90%] bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 space-y-3 animate-in slide-in-from-bottom-4 duration-300" onClick={e => e.stopPropagation()}>
@@ -457,18 +560,9 @@ const App: React.FC = () => {
                    { id: 'reports', label: 'financial reports', icon: FileText, desc: 'excel exports' },
                    { id: 'settings', label: 'system settings', icon: Settings, desc: 'categories' }
                  ].map(item => (
-                   <button 
-                    key={item.id}
-                    onClick={() => { setActiveTab(item.id as TabType); setIsMobileMenuOpen(false); }}
-                    className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 border border-slate-50 transition-all text-left group active:scale-95"
-                   >
-                     <div className="bg-slate-50 p-2.5 rounded-xl text-slate-500 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
-                       <item.icon className="w-4 h-4" />
-                     </div>
-                     <div>
-                       <p className="font-black text-slate-800 text-xs lowercase">{item.label}</p>
-                       <p className="text-[9px] text-slate-400 font-bold lowercase">{item.desc}</p>
-                     </div>
+                   <button key={item.id} onClick={() => { setActiveTab(item.id as TabType); setIsMobileMenuOpen(false); }} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 border border-slate-50 transition-all text-left group active:scale-95">
+                     <div className="bg-slate-50 p-2.5 rounded-xl text-slate-500 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors"><item.icon className="w-4 h-4" /></div>
+                     <div><p className="font-black text-slate-800 text-xs lowercase">{item.label}</p><p className="text-[9px] text-slate-400 font-bold lowercase">{item.desc}</p></div>
                    </button>
                  ))}
               </div>
@@ -476,32 +570,12 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Primary Mobile Bottom Navigation */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-1 px-4 py-2 bg-slate-900/95 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl md:hidden w-[92%] justify-between">
-        <button onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all active:scale-90 ${activeTab === 'overview' ? 'text-emerald-400' : 'text-slate-500'}`}>
-          <LayoutDashboard className="w-4 h-4" />
-          <span className="text-[8px] font-black lowercase tracking-wide">dash</span>
-        </button>
-        <button onClick={() => { setActiveTab('income'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all active:scale-90 ${activeTab === 'income' ? 'text-emerald-400' : 'text-slate-500'}`}>
-          <ArrowUpCircle className="w-4 h-4" />
-          <span className="text-[8px] font-black lowercase tracking-wide">earn</span>
-        </button>
-        
-        <div className="relative -mt-10 px-2">
-          <button onClick={() => { setEditingTransaction(null); setActiveTab('expenses'); setIsMobileMenuOpen(false); }} className="p-3 bg-emerald-500 rounded-xl text-white shadow-lg shadow-emerald-500/30 border-4 border-slate-900 active:scale-90 transition-all">
-            <PlusCircle className="w-5 h-5" />
-          </button>
-        </div>
-        
-        <button onClick={() => { setActiveTab('expenses'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all active:scale-90 ${activeTab === 'expenses' ? 'text-amber-400' : 'text-slate-500'}`}>
-          <Zap className="w-4 h-4" />
-          <span className="text-[8px] font-black lowercase tracking-wide">spend</span>
-        </button>
-        
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all active:scale-90 ${isMobileMenuOpen ? 'text-teal-400' : 'text-slate-500'}`}>
-          {isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-          <span className="text-[8px] font-black lowercase tracking-wide">more</span>
-        </button>
+        <button onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all active:scale-90 ${activeTab === 'overview' ? 'text-emerald-400' : 'text-slate-500'}`}><LayoutDashboard className="w-4 h-4" /><span className="text-[8px] font-black lowercase tracking-wide">dash</span></button>
+        <button onClick={() => { setActiveTab('income'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all active:scale-90 ${activeTab === 'income' ? 'text-emerald-400' : 'text-slate-500'}`}><ArrowUpCircle className="w-4 h-4" /><span className="text-[8px] font-black lowercase tracking-wide">earn</span></button>
+        <div className="relative -mt-10 px-2"><button onClick={() => { setEditingTransaction(null); setPreselectedCategory(null); setActiveTab('expenses'); setIsMobileMenuOpen(false); }} className="p-3 bg-emerald-500 rounded-xl text-white shadow-lg shadow-emerald-500/30 border-4 border-slate-900 active:scale-90 transition-all"><PlusCircle className="w-5 h-5" /></button></div>
+        <button onClick={() => { setActiveTab('expenses'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all active:scale-90 ${activeTab === 'expenses' ? 'text-amber-400' : 'text-slate-500'}`}><Zap className="w-4 h-4" /><span className="text-[8px] font-black lowercase tracking-wide">spend</span></button>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`flex flex-col items-center gap-1 flex-1 py-1.5 transition-all active:scale-90 ${isMobileMenuOpen ? 'text-teal-400' : 'text-slate-500'}`}>{isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}<span className="text-[8px] font-black lowercase tracking-wide">more</span></button>
       </div>
     </div>
   );

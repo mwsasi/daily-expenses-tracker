@@ -25,8 +25,8 @@ import {
   ResponsiveContainer, 
   Cell
 } from 'recharts';
-import { Transaction, DailySummary, TransactionType, CategoryConfig } from '../types';
-import { getCategoryConfig } from '../constants';
+import { Transaction, DailySummary, TransactionType, CategoryConfig } from './types';
+import { getCategoryConfig } from './constants';
 import DateDropdown, { DatePreset } from './components/DateDropdown';
 
 interface ReportViewProps {
@@ -88,8 +88,8 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     setEndDate(end);
   }, [datePreset, todayStr]);
 
-  const escapeXML = (str: string) => {
-    if (!str) return '';
+  const escapeXML = (str: any) => {
+    if (str === null || str === undefined) return '';
     return str.toString()
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -98,7 +98,10 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
       .replace(/'/g, '&apos;');
   };
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat(undefined, { minimumFractionDigits: 2 }).format(val);
+  const formatCurrency = (val: number) => new Intl.NumberFormat(undefined, { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  }).format(val);
 
   const periodTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -124,19 +127,19 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   }, [periodTransactions]);
 
   const ledgerData = useMemo(() => {
-    const allDates = Array.from(new Set(transactions.map(t => t.date))).sort();
+    const allDates: string[] = Array.from(new Set(transactions.map(t => t.date))).sort() as string[];
     const ledgerMap: Record<string, any> = {};
     let runningBalance = 0;
 
-    allDates.forEach(date => {
+    allDates.forEach((date: string) => {
       const dayTxs = transactions.filter(t => t.date === date);
-      const dayOpening = dayTxs.filter(t => t.category === 'Opening Balance').reduce((sum, t) => sum + t.amount, 0);
-      const dayIncome = dayTxs.filter(t => t.type === TransactionType.INCOME && t.category !== 'Opening Balance').reduce((sum, t) => sum + t.amount, 0);
-      const dayExpenses = dayTxs.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
-      const daySavings = dayTxs.filter(t => t.type === TransactionType.SAVINGS).reduce((sum, t) => sum + t.amount, 0);
+      const dayOpening = dayTxs.filter(t => t.category === 'Opening Balance').reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+      const dayIncome = dayTxs.filter(t => t.type === TransactionType.INCOME && t.category !== 'Opening Balance').reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+      const dayExpenses = dayTxs.filter(t => t.type === TransactionType.EXPENSE).reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+      const daySavings = dayTxs.filter(t => t.type === TransactionType.SAVINGS).reduce((sum: number, t: Transaction) => sum + t.amount, 0);
       
       const catBreakdown: Record<string, number> = {};
-      dayTxs.forEach(t => {
+      dayTxs.forEach((t: Transaction) => {
         catBreakdown[t.category] = (catBreakdown[t.category] || 0) + t.amount;
       });
 
@@ -174,7 +177,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
         dataMap[t.category].amount += t.amount;
       });
     return Object.entries(dataMap)
-      .map(([name, data]) => ({
+      .map(([name, data]: [string, { amount: number, color: string }]) => ({
         name,
         amount: data.amount,
         color: data.color
@@ -183,18 +186,18 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   }, [periodTransactions, customCategories]);
 
   const generateExcelXML = () => {
-    const periodLabel = `${startDate}_to_${endDate}`;
-    const allUsedCats = Array.from(new Set(periodTransactions.map(t => t.category))).sort();
+    const periodLabel: string = escapeXML(`${startDate} to ${endDate}`);
+    const allUsedCats: string[] = Array.from(new Set(periodTransactions.map((t: Transaction) => t.category))).sort() as string[];
     
-    const priorityCategories = ['Opening Balance', 'Daily Income', 'Savings'];
-    const otherCategories = allUsedCats.filter(cat => !priorityCategories.includes(cat));
-    const finalMatrixCats = [
-      ...priorityCategories.filter(cat => allUsedCats.includes(cat)),
+    const priorityCategories: string[] = ['Opening Balance', 'Daily Income', 'Savings'];
+    const otherCategories: string[] = allUsedCats.filter((cat: string) => !priorityCategories.includes(cat));
+    const finalMatrixCats: string[] = [
+      ...priorityCategories.filter((cat: string) => allUsedCats.includes(cat)),
       ...otherCategories
     ];
     
     const columnTotals: Record<string, number> = {};
-    finalMatrixCats.forEach(cat => {
+    finalMatrixCats.forEach((cat: string) => {
       columnTotals[cat] = periodTransactions.filter(t => t.category === cat).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     });
 
@@ -219,19 +222,17 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
    </Borders>
   </Style>
   <Style ss:ID="TotalStyle">
    <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#1E293B"/>
    <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
-  </Style>
-  <Style ss:ID="CurrencyStyle">
-   <NumberFormat ss:Format="&quot;RS&quot;\ #,##0.00"/>
-  </Style>
-  <Style ss:ID="TotalCurrencyStyle">
-   <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#1E293B"/>
-   <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
-   <NumberFormat ss:Format="&quot;RS&quot;\ #,##0.00"/>
+   <Borders>
+    <Border ss:Position="Top" ss:LineStyle="Double" ss:Weight="3"/>
+   </Borders>
   </Style>
   <Style ss:ID="BoldLabel">
    <Font ss:FontName="Segoe UI" ss:Bold="1"/>
@@ -248,10 +249,10 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Metric</Data></Cell>
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Value (RS)</Data></Cell>
    </Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Gross Monthly Income</Data></Cell><Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${fullPeriodSummary.income}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Operational Expenses</Data></Cell><Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${fullPeriodSummary.expense}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Wealth Reallocation (Savings)</Data></Cell><Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${fullPeriodSummary.savings}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Closing Total Wealth</Data></Cell><Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${summary.currentBalance + summary.totalSavings}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Gross Monthly Income</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.income)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Operational Expenses</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.expense)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Wealth Reallocation (Savings)</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.savings)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Closing Total Wealth</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(summary.currentBalance + summary.totalSavings)}</Data></Cell></Row>
   </Table>
  </Worksheet>
 
@@ -259,38 +260,41 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   <Table ss:DefaultColumnWidth="120">
    <Row ss:Height="25">
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Date</Data></Cell>
-    ${finalMatrixCats.map(cat => `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXML(cat)}</Data></Cell>`).join('')}
+    ${finalMatrixCats.map((cat: string) => `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXML(cat)}</Data></Cell>`).join('')}
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Liquid Position</Data></Cell>
    </Row>`;
 
-    ledgerData.forEach(day => {
-      xml += `<Row>
-    <Cell ss:StyleID="CenterText"><Data ss:Type="String">${day.date}</Data></Cell>
-    ${finalMatrixCats.map(cat => {
+    ledgerData.forEach((day: any) => {
+      xml += `
+   <Row>
+    <Cell ss:StyleID="CenterText"><Data ss:Type="String">${escapeXML(day.date)}</Data></Cell>
+    ${finalMatrixCats.map((cat: string) => {
       const amt = day.categories[cat] || 0;
-      return `<Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${amt}</Data></Cell>`;
+      return `<Cell><Data ss:Type="String">RS ${formatCurrency(amt)}</Data></Cell>`;
     }).join('')}
-    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${day.available}</Data></Cell>
+    <Cell><Data ss:Type="String">RS ${formatCurrency(day.available)}</Data></Cell>
    </Row>`;
     });
 
     if (ledgerData.length > 0) {
-      xml += `<Row ss:Height="25">
+      xml += `
+   <Row ss:Height="25">
     <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">GRAND TOTAL</Data></Cell>
-    ${finalMatrixCats.map(cat => `<Cell ss:StyleID="TotalCurrencyStyle"><Data ss:Type="Number">${columnTotals[cat] || 0}</Data></Cell>`).join('')}
-    <Cell ss:StyleID="TotalCurrencyStyle"><Data ss:Type="Number">${ledgerData[ledgerData.length - 1]?.available || 0}</Data></Cell>
+    ${finalMatrixCats.map((cat: string) => `<Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS ${formatCurrency(columnTotals[cat] || 0)}</Data></Cell>`).join('')}
+    <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS ${formatCurrency(ledgerData[ledgerData.length - 1]?.available || 0)}</Data></Cell>
    </Row>`;
     }
 
-    xml += `</Table>
+    xml += `
+  </Table>
  </Worksheet>
 </Workbook>`;
 
-    const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const blob = new Blob([xml], { type: 'text/xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `SpendWise_Report_${periodLabel.replace(/-/g, '_')}.xls`;
+    link.download = `SpendWise_Report_${startDate.replace(/-/g, '_')}_to_${endDate.replace(/-/g, '_')}.xls`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -351,11 +355,11 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100"><p className="text-[10px] font-black text-emerald-600 tracking-widest mb-1.5 lowercase">period inflow</p><p className="text-xl font-black text-emerald-700">RS {formatCurrency(fullPeriodSummary.income)}</p></div>
-          <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100"><p className="text-[10px] font-black text-rose-600 tracking-widest mb-1.5 lowercase">period outflow</p><p className="text-xl font-black text-rose-700">RS {formatCurrency(fullPeriodSummary.expense)}</p></div>
-          <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100"><p className="text-[10px] font-black text-teal-600 tracking-widest mb-1.5 lowercase">period savings</p><p className="text-xl font-black text-teal-700">RS {formatCurrency(fullPeriodSummary.savings)}</p></div>
-          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100"><p className="text-[10px] font-black text-blue-600 tracking-widest mb-1.5 lowercase">period surplus</p><p className="text-xl font-black text-blue-700">RS {formatCurrency(fullPeriodSummary.net)}</p></div>
-          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100"><div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-indigo-600 tracking-widest lowercase">total net worth</p><Landmark className="w-3.5 h-3.5 text-indigo-400" /></div><p className="text-xl font-black text-indigo-700">RS {formatCurrency(summary.currentBalance + summary.totalSavings)}</p></div>
+          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 group transition-all hover:shadow-lg hover:shadow-emerald-100/50"><p className="text-[10px] font-black text-emerald-600 tracking-widest mb-1.5 lowercase">period inflow</p><p className="text-xl font-black text-emerald-700">RS {formatCurrency(fullPeriodSummary.income)}</p></div>
+          <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100 group transition-all hover:shadow-lg hover:shadow-rose-100/50"><p className="text-[10px] font-black text-rose-600 tracking-widest mb-1.5 lowercase">period outflow</p><p className="text-xl font-black text-rose-700">RS {formatCurrency(fullPeriodSummary.expense)}</p></div>
+          <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 group transition-all hover:shadow-lg hover:shadow-teal-100/50"><p className="text-[10px] font-black text-teal-600 tracking-widest mb-1.5 lowercase">period savings</p><p className="text-xl font-black text-teal-700">RS {formatCurrency(fullPeriodSummary.savings)}</p></div>
+          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 group transition-all hover:shadow-lg hover:shadow-blue-100/50"><p className="text-[10px] font-black text-blue-600 tracking-widest mb-1.5 lowercase">period surplus</p><p className="text-xl font-black text-blue-700">RS {formatCurrency(fullPeriodSummary.net)}</p></div>
+          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 group transition-all hover:shadow-lg hover:shadow-indigo-100/50"><div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-indigo-600 tracking-widest lowercase">total net worth</p><Landmark className="w-3.5 h-3.5 text-indigo-400" /></div><p className="text-xl font-black text-indigo-700">RS {formatCurrency(summary.currentBalance + summary.totalSavings)}</p></div>
         </div>
 
         <div className="pt-8 border-t border-slate-100">
@@ -403,7 +407,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
               <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 lowercase"><th className="px-8 py-5">value date</th><th className="px-8 py-5">category context</th><th className="px-8 py-5">note / details</th><th className="px-8 py-5 text-right">settled amount</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-xs">
-              {periodTransactions.slice().reverse().map((row) => (
+              {periodTransactions.slice().reverse().map((row: Transaction) => (
                 <tr key={row.id} className="hover:bg-slate-50/80 transition-colors group">
                   <td className="px-8 py-5 font-bold text-slate-400 group-hover:text-slate-800 transition-colors">{row.date}</td>
                   <td className="px-8 py-5 font-black text-slate-800 uppercase tracking-tight lowercase">{row.category}</td>

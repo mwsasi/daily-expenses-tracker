@@ -23,6 +23,7 @@ export interface Transaction {
   category: Category;
   amount: number;
   note: string;
+  account?: 'Commercial Bank' | 'Amana Bank';
 }
 
 export interface Budget {

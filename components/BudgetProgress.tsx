@@ -11,7 +11,7 @@ interface BudgetProgressProps {
 }
 
 const BudgetProgress: React.FC<BudgetProgressProps> = ({ budgets, monthlySpending, customCategories }) => {
-  const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
+  const currentMonthName = new Date().toLocaleString('default', { month: 'long' }).toLowerCase();
   
   const activeBudgets = (Object.entries(budgets) as [string, number][])
     .filter(([_, limit]) => limit > 0)
@@ -38,7 +38,7 @@ const BudgetProgress: React.FC<BudgetProgressProps> = ({ budgets, monthlySpendin
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-8">
         {activeBudgets.map(([catName, limit]) => {
           const spent = monthlySpending[catName] || 0;
-          const percent = Math.min((spent / limit) * 100, 100);
+          const percent = (spent / limit) * 100;
           const config = getCategoryConfig(catName, customCategories);
           const IconComp = ICON_MAP[config.iconName] || MoreHorizontal;
           const isOverBudget = spent > limit;
@@ -46,18 +46,19 @@ const BudgetProgress: React.FC<BudgetProgressProps> = ({ budgets, monthlySpendin
           let statusColor = 'text-emerald-500';
           let bgColor = config.color;
           let StatusIcon = CheckCircle2;
-          let message = `you have utilized ${percent.toFixed(0)}% of your ${catName} budget.`;
+          // Specific detailed message
+          let message = `you have spent ${percent.toFixed(0)}% of your ${catName} budget for ${currentMonthName}.`;
 
           if (percent >= 100) {
             statusColor = 'text-rose-500';
             bgColor = '#ef4444'; // Force red on over-budget
             StatusIcon = AlertCircle;
-            message = `exceeded ${catName} budget by RS ${(spent - limit).toFixed(2)}. action required.`;
+            message = `critical: you have exceeded your ${catName} budget for ${currentMonthName} by RS ${(spent - limit).toFixed(2)}.`;
           } else if (percent >= 80) {
             statusColor = 'text-amber-500';
             bgColor = '#f59e0b'; // Force amber on warning
             StatusIcon = AlertTriangle;
-            message = `approaching limit! ${percent.toFixed(0)}% of ${catName} budget consumed.`;
+            message = `caution: you have spent ${percent.toFixed(0)}% of your ${catName} budget for ${currentMonthName}.`;
           }
 
           return (
@@ -91,7 +92,7 @@ const BudgetProgress: React.FC<BudgetProgressProps> = ({ budgets, monthlySpendin
               <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden p-0.5">
                 <div 
                   className="h-full rounded-full transition-all duration-1000 ease-out" 
-                  style={{ width: `${percent}%`, backgroundColor: bgColor }}
+                  style={{ width: `${Math.min(percent, 100)}%`, backgroundColor: bgColor }}
                 />
               </div>
               
