@@ -52,7 +52,6 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
   editingTransaction,
   onCancelEdit
 }) => {
-  // Persistence for projector settings
   const [annualRate, setAnnualRate] = useState<number>(() => {
     const saved = localStorage.getItem('spendwise_projector_rate');
     return saved ? parseFloat(saved) : 7.0;
@@ -62,7 +61,6 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
     return saved ? parseInt(saved) : 10;
   });
   
-  // State for the projected value to decouple it from immediate transaction reactivity
   const [projectedValue, setProjectedValue] = useState<number>(0);
   
   const [targetAmount, setTargetAmount] = useState<number>(() => {
@@ -80,11 +78,9 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
     return savingsTransactions.reduce((sum, t) => sum + t.amount, 0);
   }, [savingsTransactions]);
 
-  // Data for Historical Growth Chart
   const growthData = useMemo(() => {
     if (savingsTransactions.length === 0) return [];
 
-    // Group by date and sort ascending for the chart
     const dailyTotals: Record<string, number> = {};
     savingsTransactions.forEach(t => {
       dailyTotals[t.date] = (dailyTotals[t.date] || 0) + t.amount;
@@ -103,18 +99,15 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
     });
   }, [savingsTransactions]);
 
-  // Compound Interest Calculation: FV = P * (1 + r)^n
   const calculateFutureValue = (principal: number, years: number, rate: number) => {
     const r = rate / 100;
     return principal * Math.pow(1 + r, years);
   };
 
-  // Only update the projection when the user changes the "inputs" (annualRate or projectionYears)
   useEffect(() => {
     const newValue = calculateFutureValue(totalSavings, projectionYears, annualRate);
     setProjectedValue(newValue);
     
-    // Save settings
     localStorage.setItem('spendwise_projector_rate', annualRate.toString());
     localStorage.setItem('spendwise_projector_years', projectionYears.toString());
   }, [annualRate, projectionYears, totalSavings]);
@@ -145,12 +138,11 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Inputs & Projection Config */}
         <div className="lg:col-span-5 space-y-8">
           <div className="space-y-3">
              <div className="flex items-center justify-between px-2">
-               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Wealth Contribution</h4>
-               <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">Savings Entry</span>
+               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] lowercase">wealth contribution</h4>
+               <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase lowercase">savings entry</span>
              </div>
              <TransactionForm 
                 onAdd={onSaveTransaction}
@@ -168,27 +160,27 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
                   <Calculator className="w-5 h-5 text-teal-600" />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px]">What-If Scenarios</h3>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.1em]">Adjust growth parameters</p>
+                  <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] lowercase">what-if scenarios</h3>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.1em] lowercase">adjust growth parameters</p>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
                 <ShieldCheck className="w-3.5 h-3.5 text-teal-500" />
-                <span className="text-[9px] font-black text-slate-500 uppercase">Stable Projection</span>
+                <span className="text-[9px] font-black text-slate-500 uppercase lowercase">stable projection</span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Expected ROI</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 lowercase">expected roi</label>
                 <div className="relative">
                   <select 
                     value={annualRate}
                     onChange={(e) => setAnnualRate(parseFloat(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-sm font-black text-slate-700 focus:outline-none focus:ring-4 focus:ring-teal-500/10 appearance-none cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-sm font-black text-slate-700 focus:outline-none focus:ring-4 focus:ring-teal-500/10 appearance-none cursor-pointer lowercase"
                   >
                     {rateOptions.map(rate => (
-                      <option key={rate} value={rate}>{rate.toFixed(1)}% Annual</option>
+                      <option key={rate} value={rate}>{rate.toFixed(1)}% annual</option>
                     ))}
                   </select>
                   <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 rotate-90 pointer-events-none" />
@@ -196,15 +188,15 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
               </div>
 
               <div className="space-y-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Time Horizon</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 lowercase">time horizon</label>
                 <div className="relative">
                   <select 
                     value={projectionYears}
                     onChange={(e) => setProjectionYears(parseInt(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-sm font-black text-slate-700 focus:outline-none focus:ring-4 focus:ring-teal-500/10 appearance-none cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-sm font-black text-slate-700 focus:outline-none focus:ring-4 focus:ring-teal-500/10 appearance-none cursor-pointer lowercase"
                   >
                     {yearOptions.map(year => (
-                      <option key={year} value={year}>{year} {year === 1 ? 'Year' : 'Years'}</option>
+                      <option key={year} value={year}>{year} {year === 1 ? 'year' : 'years'}</option>
                     ))}
                   </select>
                   <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 rotate-90 pointer-events-none" />
@@ -213,28 +205,27 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
             </div>
 
             <div className="space-y-2">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Portfolio Goal Target</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 lowercase">portfolio goal target</label>
               <div className="relative">
                 <input 
                   type="number"
                   value={targetAmount || ''}
                   onChange={(e) => setTargetAmount(parseFloat(e.target.value) || 0)}
-                  placeholder="Set your target Rs..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-slate-700 focus:outline-none focus:ring-4 focus:ring-teal-500/10"
+                  placeholder="set your target RS..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-slate-700 focus:outline-none focus:ring-4 focus:ring-teal-500/10 lowercase"
                 />
                 <Target className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
               </div>
             </div>
             
             <div className="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-200">
-               <p className="text-[10px] text-slate-500 font-bold leading-relaxed italic">
-                 Projections only recalculate when Return or Years are adjusted. This maintains a steady vision for your wealth goals.
+               <p className="text-[10px] text-slate-500 font-bold leading-relaxed italic lowercase">
+                 projections only recalculate when return or years are adjusted. this maintains a steady vision for your wealth goals.
                </p>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Prominent Projections & Portfolio */}
         <div className="lg:col-span-7 space-y-8">
           <div className="bg-slate-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden group border border-white/5">
             <div className="absolute -top-12 -right-12 p-12 opacity-[0.02] group-hover:scale-110 transition-transform duration-[2s]">
@@ -244,9 +235,9 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
             <div className="relative z-10 space-y-10">
               <div className="flex items-center justify-between">
                 <div className="space-y-1.5">
-                  <h3 className="text-xs font-black text-teal-400 uppercase tracking-[0.4em]">Wealth Forecast</h3>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
-                    Based on {annualRate}% Return over {projectionYears} Years
+                  <h3 className="text-xs font-black text-teal-400 uppercase tracking-[0.4em] lowercase">wealth forecast</h3>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest lowercase">
+                    based on {annualRate}% return over {projectionYears} years
                   </p>
                 </div>
                 <div className="bg-teal-500/10 p-4 rounded-[1.5rem] border border-teal-500/20 shadow-inner">
@@ -256,26 +247,26 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
 
               <div className="space-y-1">
                 <p className="text-7xl font-black tracking-tighter text-white drop-shadow-2xl text-center md:text-left">
-                  Rs {formatCurrency(projectedValue)}
+                  RS {formatCurrency(projectedValue)}
                 </p>
-                <p className="text-[10px] font-black text-teal-500/60 uppercase tracking-[0.2em] ml-1">Estimated Net Portfolio Value</p>
+                <p className="text-[10px] font-black text-teal-500/60 uppercase tracking-[0.2em] ml-1 lowercase">estimated net portfolio value</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                 <div className="p-6 rounded-[2.5rem] bg-white/5 border border-white/10 hover:bg-white/[0.07] transition-colors">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Invested Principal</p>
-                  <p className="text-2xl font-black text-white">Rs {formatCurrency(totalSavings)}</p>
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 lowercase">invested principal</p>
+                  <p className="text-2xl font-black text-white">RS {formatCurrency(totalSavings)}</p>
                 </div>
                 <div className="p-6 rounded-[2.5rem] bg-teal-500/5 border border-teal-500/10 hover:bg-teal-500/10 transition-colors">
-                  <p className="text-[10px] font-black text-teal-500/70 uppercase tracking-widest mb-1.5">Projected Growth</p>
-                  <p className="text-2xl font-black text-teal-400">+ Rs {formatCurrency(projectedGrowth)}</p>
+                  <p className="text-[10px] font-black text-teal-500/70 uppercase tracking-widest mb-1.5 lowercase">projected growth</p>
+                  <p className="text-2xl font-black text-teal-400">+ RS {formatCurrency(projectedGrowth)}</p>
                 </div>
               </div>
 
               {targetAmount > 0 && (
                 <div className="space-y-4 pt-6">
-                  <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-[0.2em]">
-                    <span className="text-slate-500">Goal Achievement Progress</span>
+                  <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-[0.2em] lowercase">
+                    <span className="text-slate-500">goal achievement progress</span>
                     <span className="text-white">{progressPercent.toFixed(1)}%</span>
                   </div>
                   <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
@@ -289,15 +280,14 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
             </div>
           </div>
 
-          {/* Savings Growth Chart */}
           <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm space-y-6">
             <div className="flex items-center gap-3">
               <div className="bg-teal-50 p-2.5 rounded-2xl">
                 <History className="w-5 h-5 text-teal-600" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-800 tracking-tight">Portfolio Growth Trajectory</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Historical Cumulative Savings</p>
+                <h3 className="text-lg font-black text-slate-800 tracking-tight lowercase">portfolio growth trajectory</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 lowercase">historical cumulative savings</p>
               </div>
             </div>
 
@@ -326,7 +316,7 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
                     <Tooltip 
                       contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
                       labelStyle={{ fontSize: '10px', fontWeight: 900, color: '#64748b', marginBottom: '4px' }}
-                      formatter={(value: number) => [`Rs ${formatCurrency(value)}`, 'Total Savings']}
+                      formatter={(value: number) => [`RS ${formatCurrency(value)}`, 'total savings']}
                     />
                     <Area 
                       type="monotone" 
@@ -342,7 +332,7 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
                   <TrendingUp className="w-12 h-12 opacity-20" />
-                  <p className="text-xs font-black uppercase tracking-widest">Awaiting growth data</p>
+                  <p className="text-xs font-black uppercase tracking-widest lowercase">awaiting growth data</p>
                 </div>
               )}
             </div>
@@ -355,8 +345,8 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
                   <TableIcon className="w-5 h-5 text-teal-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight">Portfolio Transactions</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Verified Savings Ledger</p>
+                  <h3 className="text-xl font-black text-slate-800 tracking-tight lowercase">portfolio transactions</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 lowercase">verified savings ledger</p>
                 </div>
               </div>
             </div>
@@ -364,11 +354,11 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
             <div className="flex-grow overflow-auto scrollbar-hide">
               <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-md">
-                  <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200">
-                    <th className="px-8 py-5">Value Date</th>
-                    <th className="px-8 py-5 text-right">Contribution</th>
-                    <th className="px-8 py-5">Allocation Context</th>
-                    <th className="px-8 py-5 text-center">Actions</th>
+                  <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 lowercase">
+                    <th className="px-8 py-5">value date</th>
+                    <th className="px-8 py-5 text-right">contribution</th>
+                    <th className="px-8 py-5">allocation context</th>
+                    <th className="px-8 py-5 text-center">actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -381,13 +371,13 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
                         {t.date}
                       </td>
                       <td className={`px-8 py-6 text-right font-mono font-black text-sm text-teal-600`}>
-                        Rs {formatCurrency(t.amount)}
+                        RS {formatCurrency(t.amount)}
                       </td>
-                      <td className="px-8 py-6 text-[11px] font-bold text-slate-500 uppercase tracking-tight">
+                      <td className="px-8 py-6 text-[11px] font-bold text-slate-500 uppercase tracking-tight lowercase">
                         {t.note}
                       </td>
                       <td className="px-8 py-6 text-center">
-                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <button onClick={() => onStartEdit(t)} className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all border border-transparent hover:border-teal-100">
                             <Edit3 className="w-4 h-4" />
                           </button>
@@ -403,7 +393,7 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
                       <td colSpan={4} className="py-24 text-center">
                         <div className="flex flex-col items-center gap-4 opacity-20">
                            <PiggyBank className="w-16 h-16" />
-                           <p className="text-sm font-black uppercase tracking-[0.2em]">Start building wealth</p>
+                           <p className="text-sm font-black uppercase tracking-[0.2em] lowercase">start building wealth</p>
                         </div>
                       </td>
                     </tr>

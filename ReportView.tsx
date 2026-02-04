@@ -4,19 +4,15 @@ import {
   FileSpreadsheet, 
   Table, 
   CalendarDays, 
-  TrendingUp, 
   TrendingDown, 
   FileText, 
   Filter, 
   ArrowRightLeft, 
-  BarChart3, 
   PiggyBank, 
   Landmark,
   PieChart as PieChartIcon,
   Zap,
   ArrowUpCircle,
-  Download,
-  Calendar,
   ChevronDown
 } from 'lucide-react';
 import { 
@@ -27,12 +23,11 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Cell,
-  Legend
+  Cell
 } from 'recharts';
-import { jsPDF } from 'jspdf';
 import { Transaction, DailySummary, TransactionType, CategoryConfig } from '../types';
-import { DEFAULT_CATEGORIES, getCategoryConfig } from '../constants';
+import { getCategoryConfig } from '../constants';
+import DateDropdown, { DatePreset } from './components/DateDropdown';
 
 interface ReportViewProps {
   transactions: Transaction[];
@@ -41,10 +36,7 @@ interface ReportViewProps {
   budgets: Record<string, number>;
 }
 
-type DatePreset = 'all' | 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'lastMonth' | 'custom';
-
-const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCategories, budgets }) => {
-  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
+const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCategories }) => {
   const todayStr = new Date().toISOString().split('T')[0];
   
   const [datePreset, setDatePreset] = useState<DatePreset>('thisMonth');
@@ -52,7 +44,6 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransactionType>('ALL');
 
-  // Handle preset calculations
   useEffect(() => {
     const now = new Date();
     let start = '';
@@ -90,37 +81,12 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
         end = todayStr;
         break;
       case 'custom':
-        // Don't override if user is setting custom dates
         return;
     }
 
-    // FIXED: Removed redundant 'if (datePreset !== "custom")' check.
-    // TypeScript correctly identifies that 'datePreset' cannot be 'custom' here 
-    // due to the early return in the switch statement for that case.
     setStartDate(start);
     setEndDate(end);
   }, [datePreset, todayStr]);
-
-  const tailwindColorToHex = (colorName: string) => {
-    const map: Record<string, string> = {
-      'blue-500': '#3b82f6',
-      'emerald-500': '#10b981',
-      'orange-500': '#f97316',
-      'red-500': '#ef4444',
-      'amber-600': '#d97706',
-      'yellow-600': '#ca8a04',
-      'purple-500': '#a855f7',
-      'indigo-500': '#6366f1',
-      'cyan-600': '#0891b2',
-      'slate-700': '#334155',
-      'rose-500': '#f43f5e',
-      'teal-500': '#14b8a6',
-      'gray-500': '#6b7280',
-      'pink-500': '#ec4899',
-      'violet-600': '#7c3aed',
-    };
-    return map[colorName.replace('bg-', '')] || '#64748b';
-  };
 
   const escapeXML = (str: string) => {
     if (!str) return '';
@@ -211,68 +177,10 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
       .map(([name, data]) => ({
         name,
         amount: data.amount,
-        color: data.color // Directly use HEX color
+        color: data.color
       }))
       .sort((a, b) => b.amount - a.amount);
   }, [periodTransactions, customCategories]);
-
-  const generatePDFSummary = () => {
-    const doc = new jsPDF();
-    const periodLabel = datePreset === 'custom' ? `${startDate} to ${endDate}` : datePreset;
-    
-    doc.setFillColor(5, 150, 105); 
-    doc.rect(0, 0, 210, 40, 'F');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
-    doc.setTextColor(255, 255, 255);
-    doc.text('SpendWise Financial Summary', 15, 25);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 150, 25);
-
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Reporting Period: ${periodLabel}`, 15, 55);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(15, 60, 195, 60);
-
-    const startY = 75;
-    const lineHeight = 12;
-
-    const metrics = [
-      { label: 'Total Period Income', value: fullPeriodSummary.income, color: [5, 150, 105] },
-      { label: 'Total Period Expenses', value: fullPeriodSummary.expense, color: [244, 63, 94] },
-      { label: 'Total Period Savings', value: fullPeriodSummary.savings, color: [20, 184, 166] },
-      { label: 'Period Net Surplus', value: fullPeriodSummary.net, color: [37, 99, 235] },
-      { label: 'Final Net Worth (Total Assets)', value: summary.currentBalance + summary.totalSavings, color: [79, 70, 229] }
-    ];
-
-    metrics.forEach((m, i) => {
-      const currentY = startY + (i * lineHeight);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(71, 85, 105);
-      doc.text(m.label, 20, currentY);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(m.color[0], m.color[1], m.color[2]);
-      doc.text(`RS ${formatCurrency(m.value)}`, 140, currentY);
-      
-      doc.setDrawColor(241, 245, 249);
-      doc.line(20, currentY + 3, 190, currentY + 3);
-    });
-
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.setTextColor(148, 163, 184);
-    doc.text('Report produced by SpendWise Daily Expense Tracker.', 15, 280);
-
-    doc.save(`SpendWise_Summary_${startDate.replace(/-/g, '_')}.pdf`);
-  };
 
   const generateExcelXML = () => {
     const periodLabel = `${startDate}_to_${endDate}`;
@@ -382,7 +290,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `SpendWise_Full_Report_${periodLabel.replace(/-/g, '_')}.xls`;
+    link.download = `SpendWise_Report_${periodLabel.replace(/-/g, '_')}.xls`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -396,23 +304,16 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
           </div>
           <div>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight lowercase">financial report engine</h2>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 lowercase">independent inflow, expense & savings analysis</p>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 lowercase">exclusive excel (.xls) analytical exports</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-4">
           <button 
-            onClick={generatePDFSummary} 
-            className="flex items-center gap-2 bg-rose-500 text-white px-6 py-4 rounded-2xl font-black text-sm hover:bg-rose-600 transition-all active:scale-95 shadow-xl shadow-rose-100 lowercase"
-          >
-            <Download className="w-5 h-5" />
-            pdf summary
-          </button>
-          <button 
             onClick={generateExcelXML} 
-            className="flex items-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-2xl font-black text-sm hover:bg-slate-800 transition-all active:scale-95 shadow-xl shadow-slate-200 lowercase"
+            className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-sm hover:bg-emerald-700 transition-all active:scale-95 shadow-xl shadow-emerald-100 lowercase w-full md:w-auto justify-center"
           >
             <FileSpreadsheet className="w-5 h-5" />
-            full cycle (.xls)
+            generate excel report
           </button>
         </div>
       </div>
@@ -426,139 +327,60 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
             </div>
             
             <div className="flex flex-wrap gap-3">
-              <button 
-                onClick={() => setTypeFilter('ALL')}
-                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === 'ALL' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}
-              >
-                all data
-              </button>
-              <button 
-                onClick={() => setTypeFilter(TransactionType.INCOME)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.INCOME ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-400 border-slate-100 hover:border-emerald-100'}`}
-              >
-                <ArrowUpCircle className="w-3.5 h-3.5" /> income
-              </button>
-              <button 
-                onClick={() => setTypeFilter(TransactionType.EXPENSE)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.EXPENSE ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-rose-400 border-slate-100 hover:border-rose-100'}`}
-              >
-                <Zap className="w-3.5 h-3.5" /> expenses
-              </button>
-              <button 
-                onClick={() => setTypeFilter(TransactionType.SAVINGS)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.SAVINGS ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-teal-400 border-slate-100 hover:border-teal-100'}`}
-              >
-                <PiggyBank className="w-3.5 h-3.5" /> savings
-              </button>
+              <button onClick={() => setTypeFilter('ALL')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === 'ALL' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>all data</button>
+              <button onClick={() => setTypeFilter(TransactionType.INCOME)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.INCOME ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-400 border-slate-100 hover:border-emerald-100'}`}><ArrowUpCircle className="w-3.5 h-3.5" /> income</button>
+              <button onClick={() => setTypeFilter(TransactionType.EXPENSE)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.EXPENSE ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-rose-400 border-slate-100 hover:border-rose-100'}`}><Zap className="w-3.5 h-3.5" /> expenses</button>
+              <button onClick={() => setTypeFilter(TransactionType.SAVINGS)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.SAVINGS ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-teal-400 border-slate-100 hover:border-teal-100'}`}><PiggyBank className="w-3.5 h-3.5" /> savings</button>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3 items-center bg-slate-50 p-3 rounded-[2rem] border border-slate-100">
-            <div className="relative">
-              <select 
-                value={datePreset} 
-                onChange={(e) => setDatePreset(e.target.value as any)} 
-                className="appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-[11px] font-black text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all shadow-sm lowercase w-40"
-              >
-                <option value="today">today</option>
-                <option value="yesterday">yesterday</option>
-                <option value="last7">last 7 days</option>
-                <option value="thisMonth">this month</option>
-                <option value="lastMonth">last month</option>
-                <option value="all">full history</option>
-                <option value="custom">custom range</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            </div>
+            <DateDropdown 
+              value={datePreset}
+              onChange={setDatePreset}
+            />
 
             {datePreset === 'custom' && (
               <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-300">
-                <input 
-                  type="date" 
-                  value={startDate} 
-                  onChange={(e) => setStartDate(e.target.value)} 
-                  className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm lowercase focus:ring-4 focus:ring-emerald-500/10 outline-none" 
-                />
+                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm lowercase focus:ring-4 focus:ring-emerald-500/10 outline-none" />
                 <ArrowRightLeft className="w-3 h-3 text-slate-300" />
-                <input 
-                  type="date" 
-                  value={endDate} 
-                  onChange={(e) => setEndDate(e.target.value)} 
-                  className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm lowercase focus:ring-4 focus:ring-emerald-500/10 outline-none" 
-                />
+                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm lowercase focus:ring-4 focus:ring-emerald-500/10 outline-none" />
               </div>
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 group transition-all hover:shadow-lg hover:shadow-emerald-100/50">
-            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1.5 lowercase">period inflow</p>
-            <p className="text-xl font-black text-emerald-700">RS {formatCurrency(fullPeriodSummary.income)}</p>
-          </div>
-          <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100 group transition-all hover:shadow-lg hover:shadow-rose-100/50">
-            <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1.5 lowercase">period outflow</p>
-            <p className="text-xl font-black text-rose-700">RS {formatCurrency(fullPeriodSummary.expense)}</p>
-          </div>
-          <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 group transition-all hover:shadow-lg hover:shadow-teal-100/50">
-            <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1.5 lowercase">period savings</p>
-            <p className="text-xl font-black text-teal-700">RS {formatCurrency(fullPeriodSummary.savings)}</p>
-          </div>
-          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 group transition-all hover:shadow-lg hover:shadow-blue-100/50">
-            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5 lowercase">period surplus</p>
-            <p className="text-xl font-black text-blue-700">RS {formatCurrency(fullPeriodSummary.net)}</p>
-          </div>
-          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 group transition-all hover:shadow-lg hover:shadow-indigo-100/50">
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest lowercase">total net worth</p>
-              <Landmark className="w-3.5 h-3.5 text-indigo-400" />
-            </div>
-            <p className="text-xl font-black text-indigo-700">RS {formatCurrency(summary.currentBalance + summary.totalSavings)}</p>
-          </div>
+          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100"><p className="text-[10px] font-black text-emerald-600 tracking-widest mb-1.5 lowercase">period inflow</p><p className="text-xl font-black text-emerald-700">RS {formatCurrency(fullPeriodSummary.income)}</p></div>
+          <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100"><p className="text-[10px] font-black text-rose-600 tracking-widest mb-1.5 lowercase">period outflow</p><p className="text-xl font-black text-rose-700">RS {formatCurrency(fullPeriodSummary.expense)}</p></div>
+          <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100"><p className="text-[10px] font-black text-teal-600 tracking-widest mb-1.5 lowercase">period savings</p><p className="text-xl font-black text-teal-700">RS {formatCurrency(fullPeriodSummary.savings)}</p></div>
+          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100"><p className="text-[10px] font-black text-blue-600 tracking-widest mb-1.5 lowercase">period surplus</p><p className="text-xl font-black text-blue-700">RS {formatCurrency(fullPeriodSummary.net)}</p></div>
+          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100"><div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-indigo-600 tracking-widest lowercase">total net worth</p><Landmark className="w-3.5 h-3.5 text-indigo-400" /></div><p className="text-xl font-black text-indigo-700">RS {formatCurrency(summary.currentBalance + summary.totalSavings)}</p></div>
         </div>
 
         <div className="pt-8 border-t border-slate-100">
           <div className="flex items-center gap-3 mb-6">
-            <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200">
-              <PieChartIcon className="w-5 h-5 text-slate-600" />
-            </div>
+            <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200"><PieChartIcon className="w-5 h-5 text-slate-600" /></div>
             <div>
               <h3 className="text-lg font-black text-slate-800 tracking-tight lowercase">category concentration</h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 lowercase">distribution analysis for {typeFilter === 'ALL' ? 'selected period' : typeFilter}</p>
             </div>
           </div>
-          
           <div className="h-[400px] w-full bg-slate-50/30 p-8 rounded-[3rem] border border-slate-100">
             {categoryConcentrationData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categoryConcentrationData} layout="vertical" margin={{ left: 40, right: 40, top: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
                   <XAxis type="number" hide />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    width={120}
-                    tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }}
-                  />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(226, 232, 240, 0.4)' }}
-                    contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)', padding: '16px' }}
-                    formatter={(value: number) => [`RS ${formatCurrency(value)}`, 'total']}
-                  />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }} />
+                  <Tooltip cursor={{ fill: 'rgba(226, 232, 240, 0.4)' }} contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)', padding: '16px' }} formatter={(value: number) => [`RS ${formatCurrency(value)}`, 'total']} />
                   <Bar dataKey="amount" radius={[0, 12, 12, 0]} barSize={32}>
-                    {categoryConcentrationData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                    {categoryConcentrationData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
-                <CalendarDays className="w-16 h-16 opacity-10" />
-                <p className="text-sm font-black uppercase tracking-[0.2em] opacity-30 lowercase">no categorical data found in this view</p>
-              </div>
+              <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4"><CalendarDays className="w-16 h-16 opacity-10" /><p className="text-sm font-black uppercase tracking-[0.2em] opacity-30 lowercase">no categorical data found in this view</p></div>
             )}
           </div>
         </div>
@@ -567,29 +389,18 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
           <div className="flex items-center gap-3">
-            <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm">
-              <Table className="w-5 h-5 text-emerald-600" />
-            </div>
+            <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm"><Table className="w-5 h-5 text-emerald-600" /></div>
             <div>
               <h3 className="text-xl font-black text-slate-800 tracking-tight lowercase">period financial log</h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 lowercase">itemized historical settlements</p>
             </div>
           </div>
-          <div className="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm">
-             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest lowercase">
-               {periodTransactions.length} verified entries
-             </span>
-          </div>
+          <div className="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm"><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest lowercase">{periodTransactions.length} verified entries</span></div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>
-              <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 lowercase">
-                <th className="px-8 py-5">value date</th>
-                <th className="px-8 py-5">category context</th>
-                <th className="px-8 py-5">note / details</th>
-                <th className="px-8 py-5 text-right">settled amount</th>
-              </tr>
+              <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 lowercase"><th className="px-8 py-5">value date</th><th className="px-8 py-5">category context</th><th className="px-8 py-5">note / details</th><th className="px-8 py-5 text-right">settled amount</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-xs">
               {periodTransactions.slice().reverse().map((row) => (
@@ -597,20 +408,11 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
                   <td className="px-8 py-5 font-bold text-slate-400 group-hover:text-slate-800 transition-colors">{row.date}</td>
                   <td className="px-8 py-5 font-black text-slate-800 uppercase tracking-tight lowercase">{row.category}</td>
                   <td className="px-8 py-5 italic text-slate-500 lowercase">{row.note}</td>
-                  <td className={`px-8 py-5 text-right font-black text-sm ${row.type === TransactionType.INCOME ? 'text-emerald-600' : row.type === TransactionType.SAVINGS ? 'text-teal-600' : 'text-slate-900'}`}>
-                    {row.type === TransactionType.EXPENSE ? '-' : row.type === TransactionType.SAVINGS ? '→' : '+'} RS {formatCurrency(row.amount)}
-                  </td>
+                  <td className={`px-8 py-5 text-right font-black text-sm ${row.type === TransactionType.INCOME ? 'text-emerald-600' : row.type === TransactionType.SAVINGS ? 'text-teal-600' : 'text-slate-900'}`}>{row.type === TransactionType.EXPENSE ? '-' : row.type === TransactionType.SAVINGS ? '→' : '+'} RS {formatCurrency(row.amount)}</td>
                 </tr>
               ))}
               {periodTransactions.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="py-24 text-center">
-                    <div className="flex flex-col items-center gap-4 opacity-10">
-                       <TrendingDown className="w-16 h-16" />
-                       <p className="text-sm font-black uppercase tracking-[0.2em] lowercase">zero transactions found for criteria</p>
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colSpan={4} className="py-24 text-center"><div className="flex flex-col items-center gap-4 opacity-10"><TrendingDown className="w-16 h-16" /><p className="text-sm font-black uppercase tracking-[0.2em] lowercase">zero transactions found for criteria</p></div></td></tr>
               )}
             </tbody>
           </table>

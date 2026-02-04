@@ -58,9 +58,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     if (!amount || parseFloat(amount) <= 0) return;
 
     const config = allCategories.find(c => c.name === category) || allCategories[allCategories.length - 1];
-    
-    // Explicitly enforce the type if we are on a specific tab (filterType)
-    // This prevents savings from being accidentally saved as expenses if a generic category is used
     const enforcedType = filterType || config.type;
 
     const transactionData: Transaction = {
@@ -89,34 +86,34 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const isEditing = !!editingTransaction;
 
   return (
-    <form onSubmit={handleSubmit} className={`bg-white p-6 rounded-2xl shadow-sm border ${isEditing ? 'border-emerald-500 ring-4 ring-emerald-50' : 'border-slate-100'} space-y-4 transition-all`}>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-semibold text-slate-800">
-          {isEditing ? 'Edit Transaction' : (filterType === TransactionType.INCOME ? 'Add New Income' : filterType === TransactionType.SAVINGS ? 'Add New Saving' : 'Add New Expense')}
+    <form onSubmit={handleSubmit} className={`bg-white p-5 md:p-6 rounded-2xl shadow-sm border ${isEditing ? 'border-emerald-500 ring-4 ring-emerald-50' : 'border-slate-100'} space-y-4 transition-all`}>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-base md:text-lg font-black text-slate-800 lowercase">
+          {isEditing ? 'edit transaction' : (filterType === TransactionType.INCOME ? 'add income' : filterType === TransactionType.SAVINGS ? 'add saving' : 'add expense')}
         </h3>
         {isEditing && (
           <button 
             type="button" 
             onClick={onCancel}
-            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors"
+            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors active:scale-90"
           >
             <X className="w-5 h-5" />
           </button>
         )}
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Date</label>
+          <label className="block text-[10px] md:text-xs font-black text-slate-500 mb-1 lowercase tracking-wide">date</label>
           <input 
             type="date" 
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-sm"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Amount</label>
+          <label className="block text-[10px] md:text-xs font-black text-slate-500 mb-1 lowercase tracking-wide">amount</label>
           <input 
             ref={amountRef}
             type="number" 
@@ -124,15 +121,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium text-lg"
+            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-black text-base"
             required
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Category</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 h-auto max-h-40 overflow-y-auto scrollbar-hide p-1 border border-slate-100 rounded-xl">
+        <label className="block text-[10px] md:text-xs font-black text-slate-500 mb-1 lowercase tracking-wide">category</label>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 h-auto max-h-40 overflow-y-auto scrollbar-hide p-1 border border-slate-100 rounded-xl">
           {categoriesToShow.map((cat) => {
             const IconComp = ICON_MAP[cat.iconName] || MoreHorizontal;
             const isActive = category === cat.name;
@@ -142,16 +139,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 key={cat.id}
                 type="button"
                 onClick={() => handleCategorySelect(cat.name)}
-                className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all ${
+                className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all active:scale-95 ${
                   isActive 
                   ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' 
-                  : 'border-slate-100 bg-white text-slate-500 hover:border-slate-300'
+                  : 'border-slate-50 bg-white text-slate-400 hover:border-slate-200'
                 }`}
               >
-                <div className={`${cat.color} p-2 rounded-lg text-white mb-1 shadow-sm`}>
-                  <IconComp className="w-4 h-4" />
+                <div 
+                  style={{ backgroundColor: cat.color }} 
+                  className="p-1.5 md:p-2 rounded-lg text-white mb-1 shadow-sm"
+                >
+                  <IconComp className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 </div>
-                <span className="text-[10px] text-center font-medium leading-tight">{cat.name}</span>
+                <span className="text-[9px] text-center font-bold lowercase leading-tight">{cat.name}</span>
               </button>
             );
           })}
@@ -159,30 +159,30 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Note (Optional)</label>
+        <label className="block text-[10px] md:text-xs font-black text-slate-500 mb-1 lowercase tracking-wide">note (optional)</label>
         <input 
           type="text" 
-          placeholder="What was this for?"
+          placeholder="what was this for?"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-sm"
         />
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         <button 
           type="submit"
-          className={`flex-grow ${isEditing ? 'bg-emerald-600 hover:bg-emerald-700' : (filterType === TransactionType.INCOME ? 'bg-emerald-600 hover:bg-emerald-700' : filterType === TransactionType.SAVINGS ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-800 hover:bg-slate-900')} text-white font-semibold py-3 rounded-xl shadow-lg transition-all active:scale-[0.98]`}
+          className={`flex-grow ${isEditing ? 'bg-emerald-600' : (filterType === TransactionType.INCOME ? 'bg-emerald-600' : filterType === TransactionType.SAVINGS ? 'bg-teal-600' : 'bg-slate-900')} text-white font-black py-3 rounded-xl shadow-lg transition-all active:scale-95 lowercase text-sm`}
         >
-          {isEditing ? 'Update Transaction' : `Add ${filterType === TransactionType.INCOME ? 'Income' : filterType === TransactionType.SAVINGS ? 'Saving' : 'Expense'}`}
+          {isEditing ? 'update entry' : `add ${filterType === TransactionType.INCOME ? 'income' : filterType === TransactionType.SAVINGS ? 'saving' : 'expense'}`}
         </button>
         {isEditing && (
           <button 
             type="button"
             onClick={onCancel}
-            className="px-6 py-3 bg-slate-100 text-slate-600 font-semibold rounded-xl hover:bg-slate-200 transition-all"
+            className="px-6 py-3 bg-slate-100 text-slate-500 font-black rounded-xl hover:bg-slate-200 transition-all active:scale-95 lowercase text-sm"
           >
-            Cancel
+            cancel
           </button>
         )}
       </div>
