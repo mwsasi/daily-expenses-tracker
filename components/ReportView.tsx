@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   FileSpreadsheet, 
@@ -33,6 +32,7 @@ import {
 import { jsPDF } from 'jspdf';
 import { Transaction, DailySummary, TransactionType, CategoryConfig } from '../types';
 import { DEFAULT_CATEGORIES, getCategoryConfig } from '../constants';
+import DateDropdown, { DatePreset } from './DateDropdown';
 
 interface ReportViewProps {
   transactions: Transaction[];
@@ -40,8 +40,6 @@ interface ReportViewProps {
   customCategories: CategoryConfig[];
   budgets: Record<string, number>;
 }
-
-type DatePreset = 'all' | 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'lastMonth' | 'custom';
 
 const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCategories, budgets }) => {
   const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
@@ -83,6 +81,10 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
         const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
         start = firstOfLastMonth.toISOString().split('T')[0];
         end = lastOfLastMonth.toISOString().split('T')[0];
+        break;
+      case 'thisYear':
+        start = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+        end = todayStr;
         break;
       case 'all':
         start = '';
@@ -423,22 +425,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
           </div>
 
           <div className="flex flex-wrap gap-3 items-center bg-slate-50 p-3 rounded-[2rem] border border-slate-100">
-            <div className="relative">
-              <select 
-                value={datePreset} 
-                onChange={(e) => setDatePreset(e.target.value as any)} 
-                className="appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-[11px] font-black text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all shadow-sm lowercase w-40"
-              >
-                <option value="today">today</option>
-                <option value="yesterday">yesterday</option>
-                <option value="last7">last 7 days</option>
-                <option value="thisMonth">this month</option>
-                <option value="lastMonth">last month</option>
-                <option value="all">full history</option>
-                <option value="custom">custom range</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            </div>
+            <DateDropdown value={datePreset} onChange={setDatePreset} />
 
             {datePreset === 'custom' && (
               <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-300">

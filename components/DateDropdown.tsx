@@ -1,14 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, ChevronDown, Check } from 'lucide-react';
 
-export type DatePreset = 'all' | 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'lastMonth' | 'custom';
-
-interface DateDropdownProps {
-  value: DatePreset;
-  onChange: (preset: DatePreset) => void;
-  className?: string;
-}
+export type DatePreset = 'all' | 'today' | 'yesterday' | 'last7' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom';
 
 const PRESETS: { id: DatePreset; label: string }[] = [
   { id: 'today', label: 'today' },
@@ -16,9 +9,16 @@ const PRESETS: { id: DatePreset; label: string }[] = [
   { id: 'last7', label: 'last 7 days' },
   { id: 'thisMonth', label: 'this month' },
   { id: 'lastMonth', label: 'last month' },
+  { id: 'thisYear', label: 'this year' },
   { id: 'all', label: 'full history' },
   { id: 'custom', label: 'custom range' },
 ];
+
+interface DateDropdownProps {
+  value: DatePreset;
+  onChange: (preset: DatePreset) => void;
+  className?: string;
+}
 
 const DateDropdown: React.FC<DateDropdownProps> = ({ value, onChange, className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,7 +51,7 @@ const DateDropdown: React.FC<DateDropdownProps> = ({ value, onChange, className 
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-full min-w-[200px] bg-white border border-slate-100 rounded-2xl shadow-2xl z-[200] py-2 animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute top-full right-0 md:left-0 mt-2 w-full min-w-[200px] bg-white border border-slate-100 rounded-2xl shadow-2xl z-[200] py-2 animate-in fade-in zoom-in-95 duration-200">
           <div className="px-3 py-1 mb-1 border-b border-slate-50">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest lowercase">select period</span>
           </div>
