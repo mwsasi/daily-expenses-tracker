@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { Transaction } from '../types';
@@ -37,7 +36,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ transactions }) => {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-indigo-200" />
-            <h3 className="font-bold text-lg">SpendWise AI Insights</h3>
+            <h3 className="font-bold text-lg capitalize">SpendWise AI Insights</h3>
           </div>
           <button 
             onClick={fetchInsights}
@@ -51,7 +50,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ transactions }) => {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-6 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-200" />
-            <p className="text-sm text-indigo-100 animate-pulse text-center">Analyzing your spending habits...</p>
+            <p className="text-sm text-indigo-100 animate-pulse text-center capitalize">Analyzing Your Spending Habits...</p>
           </div>
         ) : (
           <div className="prose prose-invert prose-sm max-w-none">
@@ -60,7 +59,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ transactions }) => {
                  {insights}
                </div>
              ) : (
-               <p className="text-indigo-200 italic">Add transactions to see AI recommendations for your finances.</p>
+               <p className="text-indigo-200 italic capitalize">Add Transactions To See AI Recommendations For Your Finances.</p>
              )}
           </div>
         )}

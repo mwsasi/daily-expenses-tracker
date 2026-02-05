@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Transaction, TransactionType, CategoryConfig } from '../types';
@@ -30,8 +29,6 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
       return acc;
     }, [] as any[]);
 
-  // Prepare data for Budget vs Spending Chart
-  // Fixed: Added explicit type cast and type guard for budgets entries
   const budgetVsSpendingData = Object.entries(budgets as Record<string, number>)
     .filter((entry): entry is [string, number] => entry[1] > 0)
     .map(([catName, limit]) => {
@@ -45,15 +42,14 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
         Spent: spent
       };
     })
-    // Fixed: Added type safety for arithmetic operation
     .sort((a, b) => (b.Spent / (b.Budget || 1)) - (a.Spent / (a.Budget || 1)));
 
-  const formatYAxis = (tickItem: number) => `RS ${tickItem}`;
+  const formatYAxis = (tickItem: number) => `RS${tickItem}`;
 
   if (transactions.length === 0) {
     return (
       <div className="bg-white p-10 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-slate-400">
-        <p className="font-bold lowercase">not enough data to generate charts</p>
+        <p className="font-bold capitalize">Not Enough Data To Generate Charts</p>
       </div>
     );
   }
@@ -62,7 +58,7 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em] mb-6 lowercase">expense distribution</h3>
+          <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em] mb-6 capitalize">Expense Distribution</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -81,7 +77,7 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
                 </Pie>
                 <Tooltip 
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                  formatter={(value: number) => [`RS ${value.toFixed(2)}`, 'amount']} 
+                  formatter={(value: number) => [`RS${value.toFixed(2)}`, 'Amount']} 
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
@@ -90,13 +86,13 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em] mb-6 lowercase">income vs expenses</h3>
+          <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em] mb-6 capitalize">Income Vs Expenses</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={[
                   {
-                    name: 'period flow',
+                    name: 'Period Flow',
                     income: transactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0),
                     expenses: transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0)
                   }
@@ -109,7 +105,7 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }} 
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                  formatter={(value: number) => [`RS ${value.toFixed(2)}`, '']} 
+                  formatter={(value: number) => [`RS${value.toFixed(2)}`, '']} 
                 />
                 <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
                 <Bar dataKey="expenses" name="Expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={40} />
@@ -123,8 +119,8 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
       {budgetVsSpendingData.length > 0 && (
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em] lowercase">budget vs spending variance</h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest lowercase">selected period</span>
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em] capitalize">Budget Vs Spending Variance</h3>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest capitalize">Selected Period</span>
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -138,7 +134,7 @@ const Charts: React.FC<ChartsProps> = ({ transactions, customCategories, budgets
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }} 
                   contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)', padding: '16px' }}
-                  formatter={(value: number, name: string) => [`RS ${value.toFixed(2)}`, name]}
+                  formatter={(value: number, name: string) => [`RS${value.toFixed(2)}`, name]}
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
                 <Bar dataKey="Budget" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={30} opacity={0.5} />

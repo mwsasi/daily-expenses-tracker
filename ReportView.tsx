@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   FileSpreadsheet, 
@@ -249,10 +248,10 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Metric</Data></Cell>
     <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Value (RS)</Data></Cell>
    </Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Gross Monthly Income</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.income)}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Operational Expenses</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.expense)}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Wealth Reallocation (Savings)</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(fullPeriodSummary.savings)}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Closing Total Wealth</Data></Cell><Cell><Data ss:Type="String">RS ${formatCurrency(summary.currentBalance + summary.totalSavings)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Gross Monthly Income</Data></Cell><Cell><Data ss:Type="String">RS${formatCurrency(fullPeriodSummary.income)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Operational Expenses</Data></Cell><Cell><Data ss:Type="String">RS${formatCurrency(fullPeriodSummary.expense)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Wealth Reallocation (Savings)</Data></Cell><Cell><Data ss:Type="String">RS${formatCurrency(fullPeriodSummary.savings)}</Data></Cell></Row>
+   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Closing Total Wealth</Data></Cell><Cell><Data ss:Type="String">RS${formatCurrency(summary.currentBalance + summary.totalSavings)}</Data></Cell></Row>
   </Table>
  </Worksheet>
 
@@ -270,9 +269,9 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     <Cell ss:StyleID="CenterText"><Data ss:Type="String">${escapeXML(day.date)}</Data></Cell>
     ${finalMatrixCats.map((cat: string) => {
       const amt = day.categories[cat] || 0;
-      return `<Cell><Data ss:Type="String">RS ${formatCurrency(amt)}</Data></Cell>`;
+      return `<Cell><Data ss:Type="String">RS${formatCurrency(amt)}</Data></Cell>`;
     }).join('')}
-    <Cell><Data ss:Type="String">RS ${formatCurrency(day.available)}</Data></Cell>
+    <Cell><Data ss:Type="String">RS${formatCurrency(day.available)}</Data></Cell>
    </Row>`;
     });
 
@@ -280,8 +279,8 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
       xml += `
    <Row ss:Height="25">
     <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">GRAND TOTAL</Data></Cell>
-    ${finalMatrixCats.map((cat: string) => `<Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS ${formatCurrency(columnTotals[cat] || 0)}</Data></Cell>`).join('')}
-    <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS ${formatCurrency(ledgerData[ledgerData.length - 1]?.available || 0)}</Data></Cell>
+    ${finalMatrixCats.map((cat: string) => `<Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS${formatCurrency(columnTotals[cat] || 0)}</Data></Cell>`).join('')}
+    <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS${formatCurrency(ledgerData[ledgerData.length - 1]?.available || 0)}</Data></Cell>
    </Row>`;
     }
 
@@ -307,17 +306,17 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
             <FileText className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight lowercase">financial report engine</h2>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 lowercase">exclusive excel (.xls) analytical exports</p>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight capitalize">Financial Report Engine</h2>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 capitalize">Exclusive Excel (.Xls) Analytical Exports</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-4">
           <button 
             onClick={generateExcelXML} 
-            className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-sm hover:bg-emerald-700 transition-all active:scale-95 shadow-xl shadow-emerald-100 lowercase w-full md:w-auto justify-center"
+            className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-sm hover:bg-emerald-700 transition-all active:scale-95 shadow-xl shadow-emerald-100 capitalize w-full md:w-auto justify-center"
           >
             <FileSpreadsheet className="w-5 h-5" />
-            generate excel report
+            Generate Excel Report
           </button>
         </div>
       </div>
@@ -327,14 +326,14 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <Filter className="w-5 h-5 text-emerald-600" />
-              <h3 className="font-black text-slate-800 uppercase tracking-[0.2em] text-[10px] lowercase">contextual filters</h3>
+              <h3 className="font-black text-slate-800 uppercase tracking-[0.2em] text-[10px] capitalize">Contextual Filters</h3>
             </div>
             
             <div className="flex flex-wrap gap-3">
-              <button onClick={() => setTypeFilter('ALL')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === 'ALL' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>all data</button>
-              <button onClick={() => setTypeFilter(TransactionType.INCOME)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.INCOME ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-400 border-slate-100 hover:border-emerald-100'}`}><ArrowUpCircle className="w-3.5 h-3.5" /> income</button>
-              <button onClick={() => setTypeFilter(TransactionType.EXPENSE)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.EXPENSE ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-rose-400 border-slate-100 hover:border-rose-100'}`}><Zap className="w-3.5 h-3.5" /> expenses</button>
-              <button onClick={() => setTypeFilter(TransactionType.SAVINGS)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all lowercase ${typeFilter === TransactionType.SAVINGS ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-teal-400 border-slate-100 hover:border-teal-100'}`}><PiggyBank className="w-3.5 h-3.5" /> savings</button>
+              <button onClick={() => setTypeFilter('ALL')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all capitalize ${typeFilter === 'ALL' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>All Data</button>
+              <button onClick={() => setTypeFilter(TransactionType.INCOME)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all capitalize ${typeFilter === TransactionType.INCOME ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-400 border-slate-100 hover:border-emerald-100'}`}><ArrowUpCircle className="w-3.5 h-3.5" /> Income</button>
+              <button onClick={() => setTypeFilter(TransactionType.EXPENSE)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all capitalize ${typeFilter === TransactionType.EXPENSE ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-rose-400 border-slate-100 hover:border-rose-100'}`}><Zap className="w-3.5 h-3.5" /> Expenses</button>
+              <button onClick={() => setTypeFilter(TransactionType.SAVINGS)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all capitalize ${typeFilter === TransactionType.SAVINGS ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-teal-400 border-slate-100 hover:border-teal-100'}`}><PiggyBank className="w-3.5 h-3.5" /> Savings</button>
             </div>
           </div>
 
@@ -346,28 +345,28 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
 
             {datePreset === 'custom' && (
               <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-300">
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm lowercase focus:ring-4 focus:ring-emerald-500/10 outline-none" />
+                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm capitalize focus:ring-4 focus:ring-emerald-500/10 outline-none" />
                 <ArrowRightLeft className="w-3 h-3 text-slate-300" />
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm lowercase focus:ring-4 focus:ring-emerald-500/10 outline-none" />
+                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm capitalize focus:ring-4 focus:ring-emerald-500/10 outline-none" />
               </div>
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 group transition-all hover:shadow-lg hover:shadow-emerald-100/50"><p className="text-[10px] font-black text-emerald-600 tracking-widest mb-1.5 lowercase">period inflow</p><p className="text-xl font-black text-emerald-700">RS {formatCurrency(fullPeriodSummary.income)}</p></div>
-          <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100 group transition-all hover:shadow-lg hover:shadow-rose-100/50"><p className="text-[10px] font-black text-rose-600 tracking-widest mb-1.5 lowercase">period outflow</p><p className="text-xl font-black text-rose-700">RS {formatCurrency(fullPeriodSummary.expense)}</p></div>
-          <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 group transition-all hover:shadow-lg hover:shadow-teal-100/50"><p className="text-[10px] font-black text-teal-600 tracking-widest mb-1.5 lowercase">period savings</p><p className="text-xl font-black text-teal-700">RS {formatCurrency(fullPeriodSummary.savings)}</p></div>
-          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 group transition-all hover:shadow-lg hover:shadow-blue-100/50"><p className="text-[10px] font-black text-blue-600 tracking-widest mb-1.5 lowercase">period surplus</p><p className="text-xl font-black text-blue-700">RS {formatCurrency(fullPeriodSummary.net)}</p></div>
-          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 group transition-all hover:shadow-lg hover:shadow-indigo-100/50"><div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-indigo-600 tracking-widest lowercase">total net worth</p><Landmark className="w-3.5 h-3.5 text-indigo-400" /></div><p className="text-xl font-black text-indigo-700">RS {formatCurrency(summary.currentBalance + summary.totalSavings)}</p></div>
+          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 group transition-all hover:shadow-lg hover:shadow-emerald-100/50"><p className="text-[10px] font-black text-emerald-600 tracking-widest mb-1.5 capitalize">Period Inflow</p><p className="text-xl font-black text-emerald-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.income)}</p></div>
+          <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100 group transition-all hover:shadow-lg hover:shadow-rose-100/50"><p className="text-[10px] font-black text-rose-600 tracking-widest mb-1.5 capitalize">Period Outflow</p><p className="text-xl font-black text-rose-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.expense)}</p></div>
+          <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 group transition-all hover:shadow-lg hover:shadow-teal-100/50"><p className="text-[10px] font-black text-teal-600 tracking-widest mb-1.5 capitalize">Period Savings</p><p className="text-xl font-black text-teal-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.savings)}</p></div>
+          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 group transition-all hover:shadow-lg hover:shadow-blue-100/50"><p className="text-[10px] font-black text-blue-600 tracking-widest mb-1.5 capitalize">Period Surplus</p><p className="text-xl font-black text-blue-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.net)}</p></div>
+          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 group transition-all hover:shadow-lg hover:shadow-indigo-100/50"><div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-indigo-600 tracking-widest capitalize">Total Net Worth</p><Landmark className="w-3.5 h-3.5 text-indigo-400" /></div><p className="text-xl font-black text-indigo-700 tracking-tighter">RS{formatCurrency(summary.currentBalance + summary.totalSavings)}</p></div>
         </div>
 
         <div className="pt-8 border-t border-slate-100">
           <div className="flex items-center gap-3 mb-6">
             <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200"><PieChartIcon className="w-5 h-5 text-slate-600" /></div>
             <div>
-              <h3 className="text-lg font-black text-slate-800 tracking-tight lowercase">category concentration</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 lowercase">distribution analysis for {typeFilter === 'ALL' ? 'selected period' : typeFilter}</p>
+              <h3 className="text-lg font-black text-slate-800 tracking-tight capitalize">Category Concentration</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 capitalize">Distribution Analysis For {typeFilter === 'ALL' ? 'Selected Period' : typeFilter}</p>
             </div>
           </div>
           <div className="h-[400px] w-full bg-slate-50/30 p-8 rounded-[3rem] border border-slate-100">
@@ -377,14 +376,14 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
                   <XAxis type="number" hide />
                   <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }} />
-                  <Tooltip cursor={{ fill: 'rgba(226, 232, 240, 0.4)' }} contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)', padding: '16px' }} formatter={(value: number) => [`RS ${formatCurrency(value)}`, 'total']} />
+                  <Tooltip cursor={{ fill: 'rgba(226, 232, 240, 0.4)' }} contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)', padding: '16px' }} formatter={(value: number) => [`RS${formatCurrency(value)}`, 'Total']} />
                   <Bar dataKey="amount" radius={[0, 12, 12, 0]} barSize={32}>
                     {categoryConcentrationData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4"><CalendarDays className="w-16 h-16 opacity-10" /><p className="text-sm font-black uppercase tracking-[0.2em] opacity-30 lowercase">no categorical data found in this view</p></div>
+              <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4"><CalendarDays className="w-16 h-16 opacity-10" /><p className="text-sm font-black uppercase tracking-[0.2em] opacity-30 capitalize">No Categorical Data Found In This View</p></div>
             )}
           </div>
         </div>
@@ -395,28 +394,28 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
           <div className="flex items-center gap-3">
             <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm"><Table className="w-5 h-5 text-emerald-600" /></div>
             <div>
-              <h3 className="text-xl font-black text-slate-800 tracking-tight lowercase">period financial log</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 lowercase">itemized historical settlements</p>
+              <h3 className="text-xl font-black text-slate-800 tracking-tight capitalize">Period Financial Log</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 capitalize">Itemized Historical Settlements</p>
             </div>
           </div>
-          <div className="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm"><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest lowercase">{periodTransactions.length} verified entries</span></div>
+          <div className="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm"><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest capitalize">{periodTransactions.length} Verified Entries</span></div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>
-              <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 lowercase"><th className="px-8 py-5">value date</th><th className="px-8 py-5">category context</th><th className="px-8 py-5">note / details</th><th className="px-8 py-5 text-right">settled amount</th></tr>
+              <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 capitalize"><th className="px-8 py-5">Value Date</th><th className="px-8 py-5">Category Context</th><th className="px-8 py-5">Note / Details</th><th className="px-8 py-5 text-right">Settled Amount</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-xs">
               {periodTransactions.slice().reverse().map((row: Transaction) => (
                 <tr key={row.id} className="hover:bg-slate-50/80 transition-colors group">
                   <td className="px-8 py-5 font-bold text-slate-400 group-hover:text-slate-800 transition-colors">{row.date}</td>
-                  <td className="px-8 py-5 font-black text-slate-800 uppercase tracking-tight lowercase">{row.category}</td>
-                  <td className="px-8 py-5 italic text-slate-500 lowercase">{row.note}</td>
-                  <td className={`px-8 py-5 text-right font-black text-sm ${row.type === TransactionType.INCOME ? 'text-emerald-600' : row.type === TransactionType.SAVINGS ? 'text-teal-600' : 'text-slate-900'}`}>{row.type === TransactionType.EXPENSE ? '-' : row.type === TransactionType.SAVINGS ? '→' : '+'} RS {formatCurrency(row.amount)}</td>
+                  <td className="px-8 py-5 font-black text-slate-800 uppercase tracking-tight capitalize">{row.category}</td>
+                  <td className="px-8 py-5 italic text-slate-500 capitalize">{row.note}</td>
+                  <td className={`px-8 py-5 text-right font-black text-sm tracking-tight ${row.type === TransactionType.INCOME ? 'text-emerald-600' : row.type === TransactionType.SAVINGS ? 'text-teal-600' : 'text-slate-900'}`}>{row.type === TransactionType.EXPENSE ? '-' : row.type === TransactionType.SAVINGS ? '→' : '+'}RS{formatCurrency(row.amount)}</td>
                 </tr>
               ))}
               {periodTransactions.length === 0 && (
-                <tr><td colSpan={4} className="py-24 text-center"><div className="flex flex-col items-center gap-4 opacity-10"><TrendingDown className="w-16 h-16" /><p className="text-sm font-black uppercase tracking-[0.2em] lowercase">zero transactions found for criteria</p></div></td></tr>
+                <tr><td colSpan={4} className="py-24 text-center"><div className="flex flex-col items-center gap-4 opacity-10"><TrendingDown className="w-16 h-16" /><p className="text-sm font-black uppercase tracking-[0.2em] capitalize">Zero Transactions Found For Criteria</p></div></td></tr>
               )}
             </tbody>
           </table>

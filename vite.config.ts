@@ -8,16 +8,16 @@ export default defineConfig({
     // Injects the API key from the environment into the application
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
   },
+  // Use esbuild for dropping console and debugger instead of terser to fix type errors.
+  // Esbuild is the default minifier in modern Vite and offers better performance.
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
-    }
+    // Using esbuild for minification to ensure compatibility and performance
+    minify: 'esbuild',
   }
 });
