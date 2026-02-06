@@ -55,3 +55,17 @@ export interface DailySummary {
   // totalSavings field to track wealth reallocation
   totalSavings: number;
 }
+
+// Define the AIStudio interface for the global window object to match ambient definitions
+export interface AIStudio {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
+
+// Extend the global Window interface for AI Studio environment
+declare global {
+  interface Window {
+    // Making aistudio optional to match environmental definitions and resolve modifier conflict
+    aistudio?: AIStudio;
+  }
+}

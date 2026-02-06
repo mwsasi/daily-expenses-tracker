@@ -20,7 +20,7 @@ export const getFinancialInsights = async (transactions: Transaction[]): Promise
   }
 
   try {
-    // Instantiate right before call to ensure latest key is used
+    // Instantiate right before call to ensure latest key is used from AI Studio context
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const currentMonth = new Date().toISOString().substring(0, 7);
@@ -35,8 +35,9 @@ export const getFinancialInsights = async (transactions: Transaction[]): Promise
       `${t.date}: ${t.type} - ${t.category}: Rs ${t.amount} (${t.note})`
     ).join('\n');
 
+    // Upgrade to gemini-3-pro-preview for complex reasoning task (financial analysis)
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       contents: `You are a professional financial advisor. Analyze the following financial activity specifically for the current month (${currentMonth}).
       
       TASK:
@@ -56,6 +57,7 @@ export const getFinancialInsights = async (transactions: Transaction[]): Promise
     });
 
     lastCallTime = Date.now();
+    // Use .text property to access content directly
     return { text: response.text || "I'm currently observing your spending. Add more data for a deeper analysis!" };
   } catch (error: any) {
     console.error("Gemini Error:", error);
