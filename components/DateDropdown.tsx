@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, ChevronDown, Check } from 'lucide-react';
 
@@ -18,9 +19,10 @@ interface DateDropdownProps {
   value: DatePreset;
   onChange: (preset: DatePreset) => void;
   className?: string;
+  'aria-label'?: string;
 }
 
-const DateDropdown: React.FC<DateDropdownProps> = ({ value, onChange, className = "" }) => {
+const DateDropdown: React.FC<DateDropdownProps> = ({ value, onChange, className = "", "aria-label": ariaLabel }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -41,23 +43,31 @@ const DateDropdown: React.FC<DateDropdownProps> = ({ value, onChange, className 
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={ariaLabel || `Filter by period: ${currentLabel}`}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
         className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2.5 min-w-[160px] text-[11px] font-black text-slate-700 hover:border-emerald-500 hover:bg-emerald-50/10 transition-all shadow-sm capitalize"
       >
         <div className="flex items-center gap-2">
-          <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+          <Calendar className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
           <span>{currentLabel}</span>
         </div>
-        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 md:left-0 mt-2 w-full min-w-[200px] bg-white border border-slate-100 rounded-2xl shadow-2xl z-[200] py-2 animate-in fade-in zoom-in-95 duration-200">
+        <div 
+          role="listbox"
+          className="absolute top-full right-0 md:left-0 mt-2 w-full min-w-[200px] bg-white border border-slate-100 rounded-2xl shadow-2xl z-[200] py-2 animate-in fade-in zoom-in-95 duration-200"
+        >
           <div className="px-3 py-1 mb-1 border-b border-slate-50">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest capitalize">Select Period</span>
           </div>
           {PRESETS.map((preset) => (
             <button
               key={preset.id}
+              role="option"
+              aria-selected={value === preset.id}
               onClick={() => {
                 onChange(preset.id);
                 setIsOpen(false);
@@ -67,7 +77,7 @@ const DateDropdown: React.FC<DateDropdownProps> = ({ value, onChange, className 
               }`}
             >
               <span>{preset.label}</span>
-              {value === preset.id && <Check className="w-3.5 h-3.5" />}
+              {value === preset.id && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
             </button>
           ))}
         </div>

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   FileSpreadsheet, 
@@ -12,7 +13,8 @@ import {
   PieChart as PieChartIcon,
   Zap,
   ArrowUpCircle,
-  ChevronDown
+  ChevronDown,
+  Calendar
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -27,6 +29,15 @@ import {
 import { Transaction, DailySummary, TransactionType, CategoryConfig } from './types';
 import { getCategoryConfig } from './constants';
 import DateDropdown, { DatePreset } from './components/DateDropdown';
+
+interface LedgerDay {
+  date: string;
+  income: number;
+  expenses: number;
+  savings: number;
+  available: number;
+  categories: Record<string, number>;
+}
 
 interface ReportViewProps {
   transactions: Transaction[];
@@ -80,6 +91,9 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
         end = todayStr;
         break;
       case 'custom':
+        if (!startDate) {
+          setStartDate(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]);
+        }
         return;
     }
 
@@ -115,38 +129,26 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     }).sort((a, b) => a.date.localeCompare(b.date));
   }, [transactions, startDate, endDate, typeFilter]);
 
-  const fullPeriodSummary = useMemo(() => {
-    let income = 0, expense = 0, savings = 0;
-    periodTransactions.forEach(t => {
-      if (t.type === TransactionType.INCOME && t.category !== 'Opening Balance') income += t.amount;
-      else if (t.type === TransactionType.EXPENSE) expense += t.amount;
-      else if (t.type === TransactionType.SAVINGS) savings += t.amount;
-    });
-    return { income, expense, savings, net: income - expense };
-  }, [periodTransactions]);
-
   const ledgerData = useMemo(() => {
     const allDates: string[] = Array.from(new Set(transactions.map(t => t.date))).sort() as string[];
-    const ledgerMap: Record<string, any> = {};
+    const ledgerMap: Record<string, LedgerDay> = {};
     let runningBalance = 0;
 
     allDates.forEach((date: string) => {
       const dayTxs = transactions.filter(t => t.date === date);
-      const dayOpening = dayTxs.filter(t => t.category === 'Opening Balance').reduce((sum: number, t: Transaction) => sum + t.amount, 0);
-      const dayIncome = dayTxs.filter(t => t.type === TransactionType.INCOME && t.category !== 'Opening Balance').reduce((sum: number, t: Transaction) => sum + t.amount, 0);
-      const dayExpenses = dayTxs.filter(t => t.type === TransactionType.EXPENSE).reduce((sum: number, t: Transaction) => sum + t.amount, 0);
-      const daySavings = dayTxs.filter(t => t.type === TransactionType.SAVINGS).reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+      const dayIncome = dayTxs.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
+      const dayExpenses = dayTxs.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
+      const daySavings = dayTxs.filter(t => t.type === TransactionType.SAVINGS).reduce((sum, t) => sum + t.amount, 0);
       
       const catBreakdown: Record<string, number> = {};
       dayTxs.forEach((t: Transaction) => {
         catBreakdown[t.category] = (catBreakdown[t.category] || 0) + t.amount;
       });
 
-      runningBalance += dayOpening + dayIncome - dayExpenses - daySavings;
+      runningBalance += dayIncome - dayExpenses - daySavings;
       
       ledgerMap[date] = { 
         date, 
-        opening: dayOpening, 
         income: dayIncome, 
         expenses: dayExpenses,
         savings: daySavings,
@@ -162,8 +164,20 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
         if (matches && endDate) matches = matches && date <= endDate;
         return matches;
       })
-      .map(date => ledgerMap[date]);
+      .sort((a, b) => b.localeCompare(a))
+      .map(date => ledgerMap[date])
+      .filter((d): d is LedgerDay => d !== undefined);
   }, [transactions, startDate, endDate]);
+
+  const fullPeriodSummary = useMemo(() => {
+    let income = 0, expense = 0, savings = 0;
+    periodTransactions.forEach(t => {
+      if (t.type === TransactionType.INCOME && t.category !== 'Opening Balance') income += t.amount;
+      else if (t.type === TransactionType.EXPENSE) expense += t.amount;
+      else if (t.type === TransactionType.SAVINGS) savings += t.amount;
+    });
+    return { income, expense, savings, net: income - expense - savings };
+  }, [periodTransactions]);
 
   const categoryConcentrationData = useMemo(() => {
     const dataMap: Record<string, { amount: number, color: string }> = {};
@@ -185,20 +199,31 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
   }, [periodTransactions, customCategories]);
 
   const generateExcelXML = () => {
-    const periodLabel: string = escapeXML(`${startDate} to ${endDate}`);
-    const allUsedCats: string[] = Array.from(new Set(periodTransactions.map((t: Transaction) => t.category))).sort() as string[];
-    
-    const priorityCategories: string[] = ['Opening Balance', 'Daily Income', 'Savings'];
-    const otherCategories: string[] = allUsedCats.filter((cat: string) => !priorityCategories.includes(cat));
-    const finalMatrixCats: string[] = [
-      ...priorityCategories.filter((cat: string) => allUsedCats.includes(cat)),
-      ...otherCategories
+    // List of columns based on the user's requested layout
+    const columns = [
+      'Date', 
+      'Opening Balance', 
+      'Daily Income', 
+      'Fuel', 
+      'Bike', 
+      'Bike Repair', 
+      'Food', 
+      'Tea', 
+      'Mobile Topup', 
+      'Internet Topup', 
+      'Parcel', 
+      'Buy Accessories', 
+      'Savings', 
+      'Others'
     ];
+
+    const expenseCols = ['Fuel', 'Bike', 'Bike Repair', 'Food', 'Tea', 'Mobile Topup', 'Internet Topup', 'Parcel', 'Buy Accessories', 'Others'];
+
+    const chronologicalLedger = [...ledgerData].sort((a, b) => a.date.localeCompare(b.date));
     
-    const columnTotals: Record<string, number> = {};
-    finalMatrixCats.forEach((cat: string) => {
-      columnTotals[cat] = periodTransactions.filter(t => t.category === cat).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    });
+    // Totals for the GRAND TOTAL row
+    const totals: Record<string, number> = {};
+    columns.forEach(col => totals[col] = 0);
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
@@ -212,12 +237,9 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
    <Borders/>
    <Font ss:FontName="Segoe UI" ss:Size="11" ss:Color="#1E293B"/>
   </Style>
-  <Style ss:ID="TitleStyle">
-   <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Size="14" ss:Color="#059669"/>
-  </Style>
   <Style ss:ID="HeaderStyle">
-   <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#FFFFFF"/>
-   <Interior ss:Color="#059669" ss:Pattern="Solid"/>
+   <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#000000"/>
+   <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
@@ -226,74 +248,101 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
     <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
    </Borders>
   </Style>
-  <Style ss:ID="TotalStyle">
-   <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#1E293B"/>
-   <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
+  <Style ss:ID="GrandTotal">
+   <Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#000000"/>
+   <Interior ss:Color="#CBD5E1" ss:Pattern="Solid"/>
    <Borders>
-    <Border ss:Position="Top" ss:LineStyle="Double" ss:Weight="3"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
    </Borders>
   </Style>
   <Style ss:ID="BoldLabel">
    <Font ss:FontName="Segoe UI" ss:Bold="1"/>
   </Style>
-  <Style ss:ID="CenterText">
-   <Alignment ss:Horizontal="Center"/>
+  <Style ss:ID="Currency">
+   <NumberFormat ss:Format="&quot;Rs &quot;#,##0.00"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="SummaryHeader">
+    <Font ss:FontName="Segoe UI" ss:Bold="1"/>
+    <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
   </Style>
  </Styles>
 
- <Worksheet ss:Name="Executive Summary">
-  <Table ss:DefaultColumnWidth="180">
-   <Row ss:Height="30"><Cell ss:StyleID="TitleStyle"><Data ss:Type="String">Wealth Assessment: ${periodLabel}</Data></Cell></Row>
-   <Row ss:Height="25">
-    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Metric</Data></Cell>
-    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Value (RS)</Data></Cell>
-   </Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Gross Monthly Income</Data></Cell><Cell><Data ss:Type="String">RS${formatCurrency(fullPeriodSummary.income)}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Operational Expenses</Data></Cell><Cell><Data ss:Type="String">RS${formatCurrency(fullPeriodSummary.expense)}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Wealth Reallocation (Savings)</Data></Cell><Cell><Data ss:Type="String">RS${formatCurrency(fullPeriodSummary.savings)}</Data></Cell></Row>
-   <Row><Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Closing Total Wealth</Data></Cell><Cell><Data ss:Type="String">RS${formatCurrency(summary.currentBalance + summary.totalSavings)}</Data></Cell></Row>
-  </Table>
- </Worksheet>
-
- <Worksheet ss:Name="Master Matrix">
+ <Worksheet ss:Name="Daily Categorical Analysis">
   <Table ss:DefaultColumnWidth="120">
    <Row ss:Height="25">
-    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Date</Data></Cell>
-    ${finalMatrixCats.map((cat: string) => `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXML(cat)}</Data></Cell>`).join('')}
-    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Liquid Position</Data></Cell>
+    ${columns.map(col => `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXML(col)}</Data></Cell>`).join('')}
    </Row>`;
 
-    ledgerData.forEach((day: any) => {
-      xml += `
-   <Row>
-    <Cell ss:StyleID="CenterText"><Data ss:Type="String">${escapeXML(day.date)}</Data></Cell>
-    ${finalMatrixCats.map((cat: string) => {
-      const amt = day.categories[cat] || 0;
-      return `<Cell><Data ss:Type="String">RS${formatCurrency(amt)}</Data></Cell>`;
-    }).join('')}
-    <Cell><Data ss:Type="String">RS${formatCurrency(day.available)}</Data></Cell>
-   </Row>`;
+    chronologicalLedger.forEach((day: LedgerDay) => {
+      xml += `<Row>`;
+      columns.forEach(col => {
+        let value: any = 0;
+        if (col === 'Date') {
+          value = day.date;
+          xml += `<Cell><Data ss:Type="String">${escapeXML(value)}</Data></Cell>`;
+          return;
+        } else if (col === 'Opening Balance') {
+          value = day.categories['Opening Balance'] || 0;
+        } else if (col === 'Daily Income') {
+          value = day.categories['Daily Income'] || 0;
+        } else {
+          value = day.categories[col] || 0;
+        }
+        
+        totals[col] += value;
+        xml += `<Cell ss:StyleID="Currency"><Data ss:Type="Number">${value}</Data></Cell>`;
+      });
+      xml += `</Row>`;
     });
 
-    if (ledgerData.length > 0) {
-      xml += `
-   <Row ss:Height="25">
-    <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">GRAND TOTAL</Data></Cell>
-    ${finalMatrixCats.map((cat: string) => `<Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS${formatCurrency(columnTotals[cat] || 0)}</Data></Cell>`).join('')}
-    <Cell ss:StyleID="TotalStyle"><Data ss:Type="String">RS${formatCurrency(ledgerData[ledgerData.length - 1]?.available || 0)}</Data></Cell>
-   </Row>`;
-    }
+    // GRAND TOTAL Row
+    xml += `<Row ss:Height="20">
+      <Cell ss:StyleID="GrandTotal"><Data ss:Type="String">GRAND TOTAL</Data></Cell>
+      ${columns.slice(1).map(col => `<Cell ss:StyleID="GrandTotal" ss:StyleID="Currency"><Data ss:Type="Number">${totals[col]}</Data></Cell>`).join('')}
+    </Row>`;
+
+    // Spacer rows
+    xml += `<Row></Row><Row></Row>`;
+
+    // Final Summary Section
+    const totalInc = totals['Daily Income'];
+    const totalExp = expenseCols.reduce((sum, col) => sum + totals[col], 0);
+    const availBal = totals['Opening Balance'] + totalInc - totalExp - totals['Savings'];
+
+    xml += `
+    <Row><Cell ss:StyleID="SummaryHeader"><Data ss:Type="String">Final Summary</Data></Cell></Row>
+    <Row>
+      <Cell><Data ss:Type="String">Total Income</Data></Cell>
+      <Cell ss:StyleID="Currency"><Data ss:Type="Number">${totalInc}</Data></Cell>
+    </Row>
+    <Row>
+      <Cell><Data ss:Type="String">Total Expenses</Data></Cell>
+      <Cell ss:StyleID="Currency"><Data ss:Type="Number">${totalExp + totals['Savings']}</Data></Cell>
+    </Row>
+    <Row>
+      <Cell ss:StyleID="BoldLabel"><Data ss:Type="String">Available Balance</Data></Cell>
+      <Cell ss:StyleID="Currency"><Data ss:Type="Number">${availBal}</Data></Cell>
+    </Row>`;
 
     xml += `
   </Table>
  </Worksheet>
 </Workbook>`;
 
-    const blob = new Blob([xml], { type: 'text/xml;charset=utf-8' });
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `SpendWise_Report_${startDate.replace(/-/g, '_')}_to_${endDate.replace(/-/g, '_')}.xls`;
+    link.download = `SpendWise_Daily_Report_${startDate || 'all'}_to_${endDate}.xls`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -307,7 +356,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
           </div>
           <div>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight capitalize">Financial Report Engine</h2>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 capitalize">Exclusive Excel (.Xls) Analytical Exports</p>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 capitalize">Standard Matrix Excel Exports</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-4">
@@ -316,7 +365,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
             className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-sm hover:bg-emerald-700 transition-all active:scale-95 shadow-xl shadow-emerald-100 capitalize w-full md:w-auto justify-center"
           >
             <FileSpreadsheet className="w-5 h-5" />
-            Generate Excel Report
+            Generate Excel Analysis
           </button>
         </div>
       </div>
@@ -337,28 +386,52 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center bg-slate-50 p-3 rounded-[2rem] border border-slate-100">
+          <div className="flex flex-wrap gap-3 items-center bg-slate-50 p-4 rounded-[2.5rem] border border-slate-100 shadow-inner">
             <DateDropdown 
               value={datePreset}
               onChange={setDatePreset}
             />
 
             {datePreset === 'custom' && (
-              <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-300">
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm capitalize focus:ring-4 focus:ring-emerald-500/10 outline-none" />
-                <ArrowRightLeft className="w-3 h-3 text-slate-300" />
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 shadow-sm capitalize focus:ring-4 focus:ring-emerald-500/10 outline-none" />
+              <div className="flex items-center gap-3 animate-in slide-in-from-left-4 duration-500 ease-out">
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">From</span>
+                  <div className="relative">
+                    <Calendar className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-600 pointer-events-none" />
+                    <input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={(e) => setStartDate(e.target.value)} 
+                      className="pl-5 bg-transparent border-none p-0 text-xs font-black text-slate-700 outline-none focus:ring-0 w-28 uppercase" 
+                    />
+                  </div>
+                </div>
+                
+                <ArrowRightLeft className="w-3.5 h-3.5 text-slate-300" />
+                
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">To</span>
+                  <div className="relative">
+                    <Calendar className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 text-rose-500 pointer-events-none" />
+                    <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={(e) => setEndDate(e.target.value)} 
+                      className="pl-5 bg-transparent border-none p-0 text-xs font-black text-slate-700 outline-none focus:ring-0 w-28 uppercase" 
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 group transition-all hover:shadow-lg hover:shadow-emerald-100/50"><p className="text-[10px] font-black text-emerald-600 tracking-widest mb-1.5 capitalize">Period Inflow</p><p className="text-xl font-black text-emerald-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.income)}</p></div>
+          <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 group transition-all hover:shadow-lg hover:shadow-emerald-100/50"><p className="text-[10px] font-black text-emerald-600 tracking-widest mb-1.5 capitalize">Opening Balance</p><p className="text-xl font-black text-emerald-700 tracking-tighter">RS{formatCurrency(summary.openingBalance)}</p></div>
           <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100 group transition-all hover:shadow-lg hover:shadow-rose-100/50"><p className="text-[10px] font-black text-rose-600 tracking-widest mb-1.5 capitalize">Period Outflow</p><p className="text-xl font-black text-rose-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.expense)}</p></div>
           <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 group transition-all hover:shadow-lg hover:shadow-teal-100/50"><p className="text-[10px] font-black text-teal-600 tracking-widest mb-1.5 capitalize">Period Savings</p><p className="text-xl font-black text-teal-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.savings)}</p></div>
-          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 group transition-all hover:shadow-lg hover:shadow-blue-100/50"><p className="text-[10px] font-black text-blue-600 tracking-widest mb-1.5 capitalize">Period Surplus</p><p className="text-xl font-black text-blue-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.net)}</p></div>
-          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 group transition-all hover:shadow-lg hover:shadow-indigo-100/50"><div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-indigo-600 tracking-widest capitalize">Total Net Worth</p><Landmark className="w-3.5 h-3.5 text-indigo-400" /></div><p className="text-xl font-black text-indigo-700 tracking-tighter">RS{formatCurrency(summary.currentBalance + summary.totalSavings)}</p></div>
+          <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 group transition-all hover:shadow-lg hover:shadow-blue-100/50"><p className="text-[10px] font-black text-blue-600 tracking-widest mb-1.5 capitalize">Net Cash Flow</p><p className="text-xl font-black text-blue-700 tracking-tighter">RS{formatCurrency(fullPeriodSummary.net)}</p></div>
+          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 group transition-all hover:shadow-lg hover:shadow-indigo-100/50"><div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-indigo-600 tracking-widest capitalize">Total Wealth</p><Landmark className="w-3.5 h-3.5 text-indigo-400" /></div><p className="text-xl font-black text-indigo-700 tracking-tighter">RS{formatCurrency(summary.currentBalance + summary.totalSavings)}</p></div>
         </div>
 
         <div className="pt-8 border-t border-slate-100">
@@ -375,7 +448,7 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
                 <BarChart data={categoryConcentrationData} layout="vertical" margin={{ left: 40, right: 40, top: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }} />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 10, fontStyle: 'normal', fontWeight: 900, fill: '#64748b' }} />
                   <Tooltip cursor={{ fill: 'rgba(226, 232, 240, 0.4)' }} contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)', padding: '16px' }} formatter={(value: number) => [`RS${formatCurrency(value)}`, 'Total']} />
                   <Bar dataKey="amount" radius={[0, 12, 12, 0]} barSize={32}>
                     {categoryConcentrationData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
@@ -394,28 +467,41 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
           <div className="flex items-center gap-3">
             <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm"><Table className="w-5 h-5 text-emerald-600" /></div>
             <div>
-              <h3 className="text-xl font-black text-slate-800 tracking-tight capitalize">Period Financial Log</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 capitalize">Itemized Historical Settlements</p>
+              <h3 className="text-xl font-black text-slate-800 tracking-tight capitalize">Financial Ledger (Live)</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 capitalize">True Running Balance Accounting</p>
             </div>
           </div>
           <div className="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm"><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest capitalize">{periodTransactions.length} Verified Entries</span></div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[900px]">
+          <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
-              <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 capitalize"><th className="px-8 py-5">Value Date</th><th className="px-8 py-5">Category Context</th><th className="px-8 py-5">Note / Details</th><th className="px-8 py-5 text-right">Settled Amount</th></tr>
+              <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 capitalize">
+                <th className="px-8 py-5">Value Date</th>
+                <th className="px-8 py-5">Category Context</th>
+                <th className="px-8 py-5">Note / Details</th>
+                <th className="px-8 py-5 text-right">Inflow/Outflow</th>
+                <th className="px-8 py-5 text-right">Cash in Hand</th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-xs">
-              {periodTransactions.slice().reverse().map((row: Transaction) => (
-                <tr key={row.id} className="hover:bg-slate-50/80 transition-colors group">
+              {ledgerData.map((row: LedgerDay) => (
+                <tr key={row.date} className="hover:bg-slate-50/80 transition-colors group">
                   <td className="px-8 py-5 font-bold text-slate-400 group-hover:text-slate-800 transition-colors">{row.date}</td>
-                  <td className="px-8 py-5 font-black text-slate-800 uppercase tracking-tight capitalize">{row.category}</td>
-                  <td className="px-8 py-5 italic text-slate-500 capitalize">{row.note}</td>
-                  <td className={`px-8 py-5 text-right font-black text-sm tracking-tight ${row.type === TransactionType.INCOME ? 'text-emerald-600' : row.type === TransactionType.SAVINGS ? 'text-teal-600' : 'text-slate-900'}`}>{row.type === TransactionType.EXPENSE ? '-' : row.type === TransactionType.SAVINGS ? '→' : '+'}RS{formatCurrency(row.amount)}</td>
+                  <td className="px-8 py-5 font-black text-slate-800 uppercase tracking-tight capitalize">Day Summary</td>
+                  <td className="px-8 py-5 italic text-slate-500 capitalize">Accumulated daily activity</td>
+                  <td className={`px-8 py-5 text-right font-black text-sm tracking-tight ${(row.income - row.expenses - row.savings) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {(row.income - row.expenses - row.savings) >= 0 ? '+' : ''}RS{formatCurrency(row.income - row.expenses - row.savings)}
+                  </td>
+                  <td className="px-8 py-5 text-right">
+                    <span className="bg-slate-100 text-slate-900 px-4 py-1.5 rounded-full font-black tabular-nums border border-slate-200">
+                      RS{formatCurrency(row.available)}
+                    </span>
+                  </td>
                 </tr>
               ))}
-              {periodTransactions.length === 0 && (
-                <tr><td colSpan={4} className="py-24 text-center"><div className="flex flex-col items-center gap-4 opacity-10"><TrendingDown className="w-16 h-16" /><p className="text-sm font-black uppercase tracking-[0.2em] capitalize">Zero Transactions Found For Criteria</p></div></td></tr>
+              {ledgerData.length === 0 && (
+                <tr><td colSpan={5} className="py-24 text-center"><div className="flex flex-col items-center gap-4 opacity-10"><TrendingDown className="w-16 h-16" /><p className="text-sm font-black uppercase tracking-[0.2em] capitalize">Zero Transactions Found For Criteria</p></div></td></tr>
               )}
             </tbody>
           </table>

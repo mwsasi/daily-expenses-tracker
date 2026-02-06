@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { TransactionType, Category, Transaction, CategoryConfig } from '../types';
 import { DEFAULT_CATEGORIES, ICON_MAP } from '../constants';
-import { MoreHorizontal, X, Plus, Building2, Landmark, CreditCard, Wallet, Coins, Globe, PiggyBank, Calendar } from 'lucide-react';
+import { MoreHorizontal, X, Plus, Building2, Landmark, CreditCard, Wallet, Coins, Globe, PiggyBank, Calendar, Loader2, CheckCircle2, Check } from 'lucide-react';
 
 interface TransactionFormProps {
   onAdd: (transaction: Transaction) => void;
@@ -41,8 +42,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const [note, setNote] = useState<string>('');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [account, setAccount] = useState<string>(accounts[0]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  
+  // New state for inline account adding
+  const [isAddingAccount, setIsAddingAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
   
   const amountRef = useRef<HTMLInputElement>(null);
+  const newAccountRef = useRef<HTMLInputElement>(null);
 
   const getAccountIcon = (name: string, index: number) => {
     const lowerName = name.toLowerCase();
@@ -74,6 +82,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   }, [editingTransaction, filterType, preselectedCategory, accounts]);
 
+  // Autofocus new account input when opened
+  useEffect(() => {
+    if (isAddingAccount) {
+      newAccountRef.current?.focus();
+    }
+  }, [isAddingAccount]);
+
   const setQuickDate = (daysAgo: number) => {
     const d = new Date();
     d.setDate(d.getDate() - daysAgo);
@@ -85,18 +100,23 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     amountRef.current?.focus();
   };
 
-  const handleAddAccount = () => {
-    const name = window.prompt("Enter New Bank Or Account Name:");
-    if (name && name.trim()) {
-      const titleCased = toTitleCase(name.trim());
+  const handleConfirmAddAccount = () => {
+    if (newAccountName.trim()) {
+      const titleCased = toTitleCase(newAccountName.trim());
       onAddAccount(titleCased);
       setAccount(titleCased);
+      setNewAccountName('');
+      setIsAddingAccount(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) return;
+    if (!amount || parseFloat(amount) <= 0 || isSubmitting) return;
+
+    setIsSubmitting(true);
+    // Visual feedback delay
+    await new Promise(r => setTimeout(r, 600));
 
     const config = allCategories.find(c => c.name === category) || allCategories[allCategories.length - 1];
     const enforcedType = filterType || config.type;
@@ -112,6 +132,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     };
 
     onAdd(transactionData);
+    
+    setIsSubmitting(false);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 2000);
+
     setAmount('');
     setNote('');
     if (!editingTransaction) {
@@ -129,7 +154,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const showAccountSelector = (filterType === TransactionType.SAVINGS) || (editingTransaction?.type === TransactionType.SAVINGS);
 
   return (
-    <form id="transaction-form" onSubmit={handleSubmit} className={`bg-white p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] shadow-sm border ${isEditing ? 'border-emerald-500 ring-4 ring-emerald-50' : 'border-slate-100'} space-y-6 transition-all`}>
+    <form id="transaction-form" onSubmit={handleSubmit} className={`bg-white p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] shadow-sm border ${isEditing ? 'border-emerald-500 ring-4 ring-emerald-50' : 'border-slate-100'} space-y-6 transition-all relative overflow-hidden`}>
+      {showSuccess && (
+        <div className="absolute inset-0 bg-emerald-600/95 backdrop-blur-sm z-[110] flex flex-col items-center justify-center text-white animate-in fade-in duration-300">
+           <CheckCircle2 className="w-16 h-16 mb-4 animate-in zoom-in duration-500" />
+           <p className="font-black text-xl uppercase tracking-widest">Entry Verified</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-black text-slate-800 capitalize">
           {isEditing ? 'Edit Financial Entry' : (filterType === TransactionType.INCOME ? 'Record New Income' : filterType === TransactionType.SAVINGS ? 'Wealth Contribution' : 'Log New Expense')}
@@ -203,14 +235,50 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 </button>
               );
             })}
-            <button 
-              type="button" 
-              onClick={handleAddAccount}
-              className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-emerald-500 hover:text-emerald-600 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="text-[10px] font-black capitalize">New Account</span>
-            </button>
+            
+            {isAddingAccount ? (
+              <div className="col-span-2 sm:col-span-2 flex items-center gap-2 animate-in slide-in-from-top-1 duration-200">
+                <div className="relative flex-1">
+                  <input
+                    ref={newAccountRef}
+                    type="text"
+                    value={newAccountName}
+                    onChange={(e) => setNewAccountName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleConfirmAddAccount(); }
+                      if (e.key === 'Escape') { setIsAddingAccount(false); setNewAccountName(''); }
+                    }}
+                    placeholder="Bank Name..."
+                    className="w-full pl-3 pr-20 py-3 rounded-xl border-2 border-emerald-500/30 focus:border-emerald-500 focus:outline-none bg-white text-[10px] font-black uppercase tracking-tight"
+                  />
+                  <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button 
+                      type="button"
+                      onClick={handleConfirmAddAccount}
+                      className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:scale-90 transition-all shadow-sm"
+                    >
+                      <Check className="w-3 h-3" />
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => { setIsAddingAccount(false); setNewAccountName(''); }}
+                      className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-slate-200 active:scale-90 transition-all"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button 
+                type="button" 
+                onClick={() => setIsAddingAccount(true)}
+                className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-emerald-500 hover:text-emerald-600 transition-all active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-[10px] font-black capitalize">New Account</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -239,8 +307,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 pt-3">
-        <button type="submit" className={`flex-grow h-16 ${isEditing ? 'bg-emerald-600' : (filterType === TransactionType.INCOME ? 'bg-emerald-600' : filterType === TransactionType.SAVINGS ? 'bg-indigo-600' : 'bg-slate-900')} text-white font-black rounded-2xl shadow-xl transition-all active:scale-[0.98] capitalize text-base tracking-wide flex items-center justify-center`}>
-          {isEditing ? 'Update Financial Record' : `Process ${filterType === TransactionType.INCOME ? 'Income' : filterType === TransactionType.SAVINGS ? 'Contribution' : 'Expenditure'}`}
+        <button 
+          type="submit" 
+          disabled={isSubmitting}
+          className={`flex-grow h-16 ${isEditing ? 'bg-emerald-600' : (filterType === TransactionType.INCOME ? 'bg-emerald-600' : filterType === TransactionType.SAVINGS ? 'bg-indigo-600' : 'bg-slate-900')} text-white font-black rounded-2xl shadow-xl transition-all active:scale-[0.98] capitalize text-base tracking-wide flex items-center justify-center disabled:opacity-50`}
+        >
+          {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : null}
+          {isSubmitting ? 'Verifying...' : (isEditing ? 'Update Financial Record' : `Process ${filterType === TransactionType.INCOME ? 'Income' : filterType === TransactionType.SAVINGS ? 'Contribution' : 'Expenditure'}`)}
         </button>
         {isEditing && (
           <button type="button" onClick={onCancel} className="px-8 h-16 bg-slate-100 text-slate-500 font-black rounded-2xl hover:bg-slate-200 transition-all active:scale-95 capitalize text-base">Discard</button>

@@ -1,8 +1,8 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   PiggyBank, 
   TrendingUp, 
-  Calculator, 
   Table as TableIcon, 
   Edit3, 
   Trash2, 
@@ -17,20 +17,14 @@ import {
   Plus,
   CreditCard,
   Globe,
-  Wallet
+  Wallet,
+  Download,
+  Loader2
 } from 'lucide-react';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
-} from 'recharts';
-import { Transaction, TransactionType, CategoryConfig } from '../types';
+import { Transaction, TransactionType, CategoryConfig, SavingsGoal } from '../types';
 import TransactionForm from './TransactionForm';
 import DateDropdown, { DatePreset } from './DateDropdown';
+import SavingsGoals from './SavingsGoals';
 
 interface CompoundSavingsProps {
   transactions: Transaction[];
@@ -44,9 +38,10 @@ interface CompoundSavingsProps {
   onAddAccount: (name: string) => void;
   ledgerDateFilter: DatePreset;
   onDateFilterChange: (preset: DatePreset) => void;
+  savingsGoals: SavingsGoal[];
+  onAddSavingsGoal: (goal: SavingsGoal) => void;
+  onDeleteSavingsGoal: (id: string) => void;
 }
-
-const BANK_ICONS = [Building2, Landmark, CreditCard, Coins, Globe, Wallet, PiggyBank];
 
 const CompoundSavings: React.FC<CompoundSavingsProps> = ({ 
   transactions, 
@@ -59,19 +54,13 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
   accounts,
   onAddAccount,
   ledgerDateFilter,
-  onDateFilterChange
+  onDateFilterChange,
+  savingsGoals,
+  onAddSavingsGoal,
+  onDeleteSavingsGoal
 }) => {
-  const [annualRate, setAnnualRate] = useState<number>(() => {
-    const saved = localStorage.getItem('spendwise_projector_rate');
-    return saved ? parseFloat(saved) : 7.0;
-  });
-  const [projectionYears, setProjectionYears] = useState<number>(() => {
-    const saved = localStorage.getItem('spendwise_projector_years');
-    return saved ? parseInt(saved) : 10;
-  });
-  
-  const [projectedValue, setProjectedValue] = useState<number>(0);
   const [bankFilter, setBankFilter] = useState<string>('all');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const filterByPreset = (txs: Transaction[], preset: DatePreset) => {
     const now = new Date();
@@ -133,22 +122,61 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
     return bankBreakdown.breakdown[bankFilter] || 0;
   }, [bankFilter, bankBreakdown]);
 
-  useEffect(() => {
-    const r = annualRate / 100;
-    const newValue = totalInView * Math.pow(1 + r, projectionYears);
-    setProjectedValue(newValue);
-    localStorage.setItem('spendwise_projector_rate', annualRate.toString());
-    localStorage.setItem('spendwise_projector_years', projectionYears.toString());
-  }, [annualRate, projectionYears, totalInView]);
-
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
   };
 
+  const generateBankWiseReport = async () => {
+    setIsGenerating(true);
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    const csvRows: string[] = [];
+    const headers = ['Bank/Account', 'Date', 'Category', 'Note', 'Amount (RS)', 'Running Bank Balance'];
+    csvRows.push(headers.join(','));
+
+    allAccounts.forEach(bank => {
+      const bankTxs = allSavingsTxs
+        .filter(t => t.account === bank)
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      if (bankTxs.length === 0) return;
+
+      let runningBalance = 0;
+      bankTxs.forEach(t => {
+        runningBalance += t.amount;
+        const row = [
+          `"${bank}"`,
+          t.date,
+          `"${t.category}"`,
+          `"${(t.note || '').replace(/"/g, '""')}"`,
+          t.amount.toFixed(2),
+          runningBalance.toFixed(2)
+        ];
+        csvRows.push(row.join(','));
+      });
+
+      // Add a subtotal/spacer row for this bank
+      csvRows.push(`${bank} TOTAL,,,,${runningBalance.toFixed(2)},`);
+      csvRows.push(',,,,,'); // Spacer
+    });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `SpendWise_Savings_BankWise_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setIsGenerating(false);
+  };
+
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-5 space-y-8">
+        <div className="lg:col-span-4 space-y-8">
           <TransactionForm 
             onAdd={onSaveTransaction}
             onCancel={onCancelEdit}
@@ -161,14 +189,14 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
 
           <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-6">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest capitalize">Banking Institutions</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {allAccounts.map((accName, idx) => {
                 const isActive = bankFilter === accName;
                 const balance = bankBreakdown.breakdown[accName] || 0;
                 return (
-                  <button key={accName} onClick={() => setBankFilter(isActive ? 'all' : accName)} className={`flex flex-col items-center justify-center p-6 rounded-[2.5rem] border-2 transition-all duration-300 ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-50 text-slate-800'}`}>
-                    <p className={`font-black text-xs capitalize truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>{accName}</p>
-                    <div className={`mt-3 px-4 py-2 rounded-full ${isActive ? 'bg-white/20' : 'bg-slate-100'} border border-black/5`}>
+                  <button key={accName} onClick={() => setBankFilter(isActive ? 'all' : accName)} className={`flex items-center justify-between p-6 rounded-2xl border-2 transition-all duration-300 ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-50 text-slate-800'}`}>
+                    <p className={`font-black text-sm capitalize truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>{accName}</p>
+                    <div className={`px-4 py-2 rounded-full ${isActive ? 'bg-white/20' : 'bg-slate-100'} border border-black/5`}>
                       <p className={`text-base font-black tracking-tighter tabular-nums ${isActive ? 'text-white' : 'text-slate-900'}`}>RS{formatCurrency(balance)}</p>
                     </div>
                   </button>
@@ -178,37 +206,40 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
           </div>
         </div>
 
-        <div className="lg:col-span-7 space-y-8">
-          <div className={`rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden group border border-white/5 transition-all duration-500 ${bankFilter !== 'all' ? 'bg-indigo-950' : 'bg-slate-900'}`}>
-            <div className="relative z-10 space-y-10">
-              <h3 className="text-xs font-black text-teal-400 uppercase tracking-[0.4em] capitalize">Wealth Forecast Engine</h3>
-              
-              <div className="inline-flex bg-white/10 px-8 py-5 rounded-full border border-white/5 backdrop-blur-md">
-                <p className="text-5xl md:text-8xl font-black tracking-tighter text-white tabular-nums">RS{formatCurrency(projectedValue)}</p>
+        <div className="lg:col-span-8 space-y-12">
+          <div className="bg-indigo-600 rounded-[3rem] p-10 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-8">
+            <div>
+              <p className="text-[10px] font-black text-indigo-100 uppercase tracking-widest mb-2">Total Wealth Allocation</p>
+              <h2 className="text-4xl md:text-6xl font-black tracking-tighter">RS{formatCurrency(totalInView)}</h2>
+            </div>
+            <div className="flex flex-col items-end gap-4">
+              <div className="bg-white/10 p-5 rounded-full border border-white/5 backdrop-blur-sm">
+                 <PiggyBank className="w-10 h-10" />
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-7 rounded-[2.5rem] bg-white/5 border border-white/10">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 capitalize">Invested Principal</p>
-                  <div className="inline-flex bg-white/10 px-5 py-2.5 rounded-full">
-                    <p className="text-2xl font-black text-white tracking-tight tabular-nums">RS{formatCurrency(totalInView)}</p>
-                  </div>
-                </div>
-                <div className="p-7 rounded-[2.5rem] bg-teal-500/5 border border-teal-500/10">
-                  <p className="text-[10px] font-black text-teal-500/70 uppercase tracking-widest mb-3 capitalize">Projected Appreciation</p>
-                  <div className="inline-flex bg-teal-500/20 px-5 py-2.5 rounded-full">
-                    <p className="text-2xl font-black text-teal-400 tracking-tight tabular-nums">+RS{formatCurrency(projectedValue - totalInView)}</p>
-                  </div>
-                </div>
-              </div>
+              <button 
+                onClick={generateBankWiseReport}
+                disabled={isGenerating || allSavingsTxs.length === 0}
+                className="flex items-center gap-2 bg-white text-indigo-600 px-6 py-3 rounded-2xl font-black text-xs hover:bg-indigo-50 transition-all active:scale-95 disabled:opacity-50 shadow-lg"
+              >
+                {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Download Bank-Wise Report
+              </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full md:max-h-[600px]">
+          <SavingsGoals 
+            goals={savingsGoals} 
+            onAdd={onAddSavingsGoal} 
+            onDelete={onDeleteSavingsGoal} 
+            transactions={transactions}
+            accounts={allAccounts}
+          />
+
+          <div className="bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full md:max-h-[700px]">
             <div className="p-5 md:p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex flex-col">
-                <h3 className="text-base md:text-2xl font-black text-indigo-600 capitalize">Savings Ledger</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Historical Wealth Reallocation</p>
+                <h3 className="text-base md:text-2xl font-black text-indigo-600 capitalize">Wealth Movement Journal</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Verified Savings Ledger</p>
               </div>
               <DateDropdown value={ledgerDateFilter} onChange={onDateFilterChange} />
             </div>
@@ -216,14 +247,15 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
               <table className="hidden md:table w-full text-left border-collapse">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                    <th className="px-8 py-5">Date</th>
-                    <th className="px-8 py-5">Source Account</th>
-                    <th className="px-8 py-5 text-right">Value</th>
+                    <th className="px-8 py-5">Value Date</th>
+                    <th className="px-8 py-5">Target Institution</th>
+                    <th className="px-8 py-5 text-right">Settled Value</th>
+                    <th className="px-8 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredSavingsTxs.length > 0 ? filteredSavingsTxs.map(t => (
-                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-8 py-6">
                         <span className="bg-slate-100 px-3 py-1.5 rounded-full text-xs font-black text-slate-500 border border-slate-200">{t.date}</span>
                       </td>
@@ -233,11 +265,21 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
                           RS{t.amount.toFixed(2)}
                         </span>
                       </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => onStartEdit(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all">
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => onRemoveTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan={3} className="px-8 py-20 text-center">
-                        <p className="text-slate-300 font-black uppercase text-[10px] tracking-widest">No savings found for this period</p>
+                      <td colSpan={4} className="px-8 py-20 text-center">
+                        <p className="text-slate-300 font-black uppercase text-[10px] tracking-widest">No verified savings found</p>
                       </td>
                     </tr>
                   )}
@@ -245,14 +287,24 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
               </table>
               <div className="md:hidden divide-y divide-slate-100">
                 {filteredSavingsTxs.map(t => (
-                  <div key={t.id} className="p-5 flex items-center justify-between active:bg-slate-50 transition-colors">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="bg-slate-100 px-2.5 py-0.5 rounded-full text-[9px] font-black text-slate-500 w-fit">{t.date}</span>
-                      <span className="text-base font-black text-slate-800 capitalize">{t.account || t.category}</span>
+                  <div key={t.id} className="p-5 space-y-3 active:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="bg-slate-100 px-2.5 py-0.5 rounded-full text-[9px] font-black text-slate-500 w-fit">{t.date}</span>
+                        <span className="text-base font-black text-slate-800 capitalize">{t.account || t.category}</span>
+                      </div>
+                      <span className="bg-teal-50 px-4 py-2 rounded-full text-base font-black tracking-tighter border border-teal-100 tabular-nums shadow-sm text-slate-900">
+                        RS{t.amount.toFixed(2)}
+                      </span>
                     </div>
-                    <span className="bg-teal-50 px-4 py-2 rounded-full text-base font-black tracking-tighter border border-teal-100 tabular-nums shadow-sm text-slate-900">
-                      RS{t.amount.toFixed(2)}
-                    </span>
+                    <div className="flex items-center justify-end gap-4 pt-1">
+                      <button onClick={() => onStartEdit(t)} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-emerald-600">
+                        <Edit3 className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button onClick={() => onRemoveTransaction(t.id)} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-rose-500">
+                        <Trash2 className="w-3.5 h-3.5" /> Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

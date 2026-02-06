@@ -32,6 +32,17 @@ export interface Budget {
   amount: number;
 }
 
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number; // Optional manual override or initial amount
+  deadline?: string;
+  color: string;
+  iconName: string;
+  linkedAccount?: string; // If specific to a bank
+}
+
 export interface DailySummary {
   openingBalance: number;
   totalIncome: number;
