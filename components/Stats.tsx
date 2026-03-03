@@ -9,7 +9,8 @@ interface StatsProps {
     todayIncome: number, 
     cumulativeIncome: number,
     totalBudget: number,
-    openingBalance: number
+    openingBalance: number,
+    monthlySavings?: number
   };
   activeTab?: string;
   onTabChange?: (tab: any) => void;
@@ -53,7 +54,7 @@ const Stats: React.FC<StatsProps> = ({ summary, activeTab, onTabChange }) => {
       accentColor: 'text-white',
       pillBg: 'bg-slate-900',
       isPrimary: true,
-      subLabel: 'Liquid Position'
+      subLabel: 'Available Liquid Cash'
     },
     {
       id: 'budget',
@@ -79,7 +80,7 @@ const Stats: React.FC<StatsProps> = ({ summary, activeTab, onTabChange }) => {
       accentColor: 'text-emerald-600',
       pillBg: 'bg-emerald-100',
       clickable: true,
-      subLabel: 'Daily Flow'
+      subLabel: 'Gross Daily Flow'
     },
     {
       id: 'income',
@@ -89,7 +90,8 @@ const Stats: React.FC<StatsProps> = ({ summary, activeTab, onTabChange }) => {
       bgColor: 'bg-emerald-50',
       accentColor: 'text-emerald-500',
       pillBg: 'bg-emerald-100',
-      clickable: true
+      clickable: true,
+      subLabel: summary.monthlySavings ? `Net: RS${formatCurrency(summary.totalIncome - summary.monthlySavings)}` : 'Gross Monthly'
     },
     {
       id: 'expenses',

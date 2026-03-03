@@ -11,6 +11,8 @@ import BudgetManager from './components/BudgetManager';
 import BudgetProgress from './components/BudgetProgress';
 import CategoryManager from './components/CategoryManager';
 import CompoundSavings from './components/CompoundSavings';
+import CloudBackup from './components/CloudBackup';
+import MonthlyReconciliation from './components/MonthlyReconciliation';
 import DateDropdown, { DatePreset } from './components/DateDropdown';
 import { 
   Trash2, 
@@ -27,7 +29,8 @@ import {
   Edit3, 
   PlusCircle,
   X,
-  ChevronRight
+  ChevronRight,
+  History
 } from 'lucide-react';
 
 type TabType = 'overview' | 'income' | 'expenses' | 'savings' | 'reports' | 'budget' | 'settings';
@@ -38,10 +41,24 @@ const App: React.FC = () => {
   const [ledgerDateFilter, setLedgerDateFilter] = useState<DatePreset>('all');
   const [preselectedCategory, setPreselectedCategory] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAddingQuickExpense, setIsAddingQuickExpense] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatBudget, setNewCatBudget] = useState('');
   
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('spendwise_transactions');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      const seen = new Set();
+      return (Array.isArray(parsed) ? parsed : []).filter((t: any) => {
+        if (!t || !t.id || seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+    } catch (e) {
+      return [];
+    }
   });
 
   const [budgets, setBudgets] = useState<Record<string, number>>(() => {
@@ -84,6 +101,34 @@ const App: React.FC = () => {
     localStorage.setItem('spendwise_savings_goals', JSON.stringify(savingsGoals));
   }, [savingsGoals]);
 
+  // Migration: Rename "Bike" to "Bike Accessories"
+  useEffect(() => {
+    let changed = false;
+    
+    // Migrate budgets
+    if (budgets['Bike'] !== undefined) {
+      const newBudgets = { ...budgets };
+      newBudgets['Bike Accessories'] = newBudgets['Bike'];
+      delete newBudgets['Bike'];
+      setBudgets(newBudgets);
+      changed = true;
+    }
+
+    // Migrate transactions
+    const hasBikeTx = transactions.some(t => t.category === 'Bike');
+    if (hasBikeTx) {
+      const newTransactions = transactions.map(t => 
+        t.category === 'Bike' ? { ...t, category: 'Bike Accessories' } : t
+      );
+      setTransactions(newTransactions);
+      changed = true;
+    }
+
+    if (changed) {
+      console.log('Migrated "Bike" to "Bike Accessories"');
+    }
+  }, []);
+
   const allCategories = useMemo(() => [...DEFAULT_CATEGORIES, ...customCategories], [customCategories]);
 
   const quickExpenseCategories = useMemo(() => 
@@ -103,12 +148,30 @@ const App: React.FC = () => {
     }
   };
 
+  const updateAccount = (oldName: string, newName: string) => {
+    const titleCased = toTitleCase(newName);
+    if (oldName === titleCased) return;
+    setAccounts(prev => prev.map(a => a === oldName ? titleCased : a));
+    setTransactions(prev => prev.map(t => t.account === oldName ? { ...t, account: titleCased } : t));
+    setSavingsGoals(prev => prev.map(g => g.linkedAccount === oldName ? { ...g, linkedAccount: titleCased } : g));
+  };
+
+  const deleteAccount = (name: string) => {
+    if (window.confirm(`Delete "${name}" and all its records? Associated transactions will remain but without an account link.`)) {
+      setAccounts(prev => prev.filter(a => a !== name));
+      setTransactions(prev => prev.map(t => t.account === name ? { ...t, account: undefined } : t));
+      setSavingsGoals(prev => prev.map(g => g.linkedAccount === name ? { ...g, linkedAccount: undefined } : g));
+    }
+  };
+
   const saveTransaction = (newTransaction: Transaction) => {
     setTransactions(prev => {
-      if (editingTransaction) {
+      const exists = prev.some(t => t.id === newTransaction.id);
+      if (exists) {
         setEditingTransaction(null);
         return prev.map(t => t.id === newTransaction.id ? newTransaction : t);
       }
+      setEditingTransaction(null);
       return [newTransaction, ...prev];
     });
     setPreselectedCategory(null);
@@ -139,9 +202,61 @@ const App: React.FC = () => {
       setSavingsGoals(prev => prev.filter(g => g.id !== id));
     }
   };
+  const updateSavingsGoal = (updatedGoal: SavingsGoal) => {
+    setSavingsGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
+  };
 
   const addCustomCategory = (cat: CategoryConfig) => setCustomCategories(prev => [...prev, cat]);
+
+  const handleCreateQuickCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+
+    const newCat: CategoryConfig = {
+      id: crypto.randomUUID(),
+      name: newCatName.trim(),
+      type: TransactionType.EXPENSE,
+      iconName: 'Zap',
+      color: '#F43F5E', // Default rose color for expenses
+      isCustom: true
+    };
+
+    addCustomCategory(newCat);
+    
+    const budgetAmount = parseFloat(newCatBudget);
+    if (!isNaN(budgetAmount) && budgetAmount > 0) {
+      setBudgets(prev => ({ ...prev, [newCat.name]: budgetAmount }));
+    }
+
+    setNewCatName('');
+    setNewCatBudget('');
+    setIsAddingQuickExpense(false);
+    
+    // Automatically trigger quick add for the new category
+    handleQuickAdd(newCat.name);
+  };
   
+  const handleBackupData = () => {
+    return {
+      transactions,
+      budgets,
+      customCategories,
+      accounts,
+      savingsGoals,
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    };
+  };
+
+  const handleRestoreData = (data: any) => {
+    if (!data) return;
+    if (data.transactions) setTransactions(data.transactions);
+    if (data.budgets) setBudgets(data.budgets);
+    if (data.customCategories) setCustomCategories(data.customCategories);
+    if (data.accounts) setAccounts(data.accounts);
+    if (data.savingsGoals) setSavingsGoals(data.savingsGoals);
+  };
+
   const updateCustomCategory = (updatedCat: CategoryConfig) => {
     const oldCat = customCategories.find(c => c.id === updatedCat.id);
     if (oldCat && oldCat.name !== updatedCat.name) {
@@ -169,30 +284,37 @@ const App: React.FC = () => {
 
   const clearAll = () => { if (window.confirm("Delete All Data? This Cannot Be Undone.")) setTransactions([]); };
 
-  const todayStr = new Date().toLocaleDateString('en-CA');
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayStr = getLocalDateString(new Date());
   const currentMonthStr = todayStr.substring(0, 7);
   const firstOfCurrentMonth = currentMonthStr + "-01";
 
   const filterByPreset = (txs: Transaction[], preset: DatePreset) => {
     const now = new Date();
-    const today = now.toLocaleDateString('en-CA');
+    const today = getLocalDateString(now);
     return txs.filter(t => {
       switch (preset) {
         case 'today': return t.date === today;
         case 'yesterday': {
           const y = new Date(now);
           y.setDate(now.getDate() - 1);
-          return t.date === y.toLocaleDateString('en-CA');
+          return t.date === getLocalDateString(y);
         }
         case 'last7': {
           const l7 = new Date(now);
           l7.setDate(now.getDate() - 7);
-          return t.date >= l7.toLocaleDateString('en-CA');
+          return t.date >= getLocalDateString(l7);
         }
-        case 'thisMonth': return t.date.startsWith(now.toLocaleDateString('en-CA').substring(0, 7));
+        case 'thisMonth': return t.date.startsWith(today.substring(0, 7));
         case 'lastMonth': {
           const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          return t.date.startsWith(lm.toLocaleDateString('en-CA').substring(0, 7));
+          return t.date.startsWith(getLocalDateString(lm).substring(0, 7));
         }
         case 'thisYear': return t.date.startsWith(now.getFullYear().toString());
         default: return true;
@@ -218,22 +340,25 @@ const App: React.FC = () => {
       const isBeforeCurrentMonth = t.date < firstOfCurrentMonth;
       const isOpeningCategory = t.category === 'Opening Balance';
 
+      // 1. Lifetime Balances (Cash in Hand)
       if (t.type === TransactionType.INCOME) {
         liquidBalance += amount;
         cumulativeInc += amount;
       } else if (t.type === TransactionType.EXPENSE) {
         liquidBalance -= amount;
       } else if (t.type === TransactionType.SAVINGS) {
-        liquidBalance -= amount;
+        liquidBalance -= amount; // Savings reduces Cash in Hand
         totalSavingsBalance += amount;
       }
 
+      // 2. Opening Balance (Balance before this month + any "Opening Balance" seed transactions)
       if (isBeforeCurrentMonth || (isOpeningCategory && t.type === TransactionType.INCOME)) {
         if (t.type === TransactionType.INCOME) opening += amount;
         else if (t.type === TransactionType.EXPENSE) opening -= amount;
         else if (t.type === TransactionType.SAVINGS) opening -= amount;
       }
 
+      // 3. Monthly Totals (Gross)
       if (isCurrentMonth) {
         if (t.type === TransactionType.INCOME && !isOpeningCategory) {
           monthlyIncome += amount;
@@ -244,9 +369,14 @@ const App: React.FC = () => {
         }
       }
       
+      // 4. Today's Totals (Gross)
       if (isToday) {
          if (t.type === TransactionType.INCOME && !isOpeningCategory) todayInc += amount;
          else if (t.type === TransactionType.EXPENSE) todayExp += amount;
+         else if (t.type === TransactionType.SAVINGS) {
+           // We don't subtract from todayInc here anymore to show Gross Income
+           // But we track it if needed
+         }
       }
     });
 
@@ -261,7 +391,8 @@ const App: React.FC = () => {
       todayIncome: todayInc,
       cumulativeIncome: cumulativeInc,
       totalBudget: totalBudgetValue,
-      totalSavings: totalSavingsBalance
+      totalSavings: totalSavingsBalance,
+      monthlySavings: monthlySavings
     };
   }, [transactions, budgets, todayStr, currentMonthStr, firstOfCurrentMonth]);
 
@@ -345,6 +476,13 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12 space-y-12">
         {activeTab === 'overview' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <MonthlyReconciliation 
+              transactions={transactions}
+              onAdd={saveTransaction}
+              onUpdate={saveTransaction}
+              onDelete={(id) => setTransactions(prev => prev.filter(t => t.id !== id))}
+              currentBalance={summary.currentBalance}
+            />
             <Stats summary={summary} onTabChange={setActiveTab} />
             
             <div className="lg:hidden bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
@@ -364,6 +502,60 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
               <div className="xl:col-span-2 space-y-12">
                 <Charts transactions={transactions} customCategories={customCategories} budgets={budgets} />
+                
+                {/* Recent Activity in Overview */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-slate-100 p-2.5 rounded-2xl border border-slate-200">
+                        <History className="w-5 h-5 text-slate-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-slate-800 tracking-tight">Recent Activity</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Edit or Delete Any Entry</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
+                    <table className="w-full text-left min-w-[600px]">
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          <th className="px-8 py-5">Date</th>
+                          <th className="px-8 py-5">Category</th>
+                          <th className="px-8 py-5 text-right">Amount</th>
+                          <th className="px-8 py-5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {transactions
+                          .slice(0, 10)
+                          .map(t => (
+                            <tr key={t.id} className="group hover:bg-slate-50 transition-colors">
+                              <td className="px-8 py-5 text-sm text-slate-500">{t.date}</td>
+                              <td className="px-8 py-5">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-2 h-2 rounded-full ${t.type === TransactionType.INCOME ? 'bg-emerald-500' : t.type === TransactionType.EXPENSE ? 'bg-rose-500' : 'bg-indigo-500'}`}></span>
+                                  <span className="font-bold text-slate-900">{t.category}</span>
+                                </div>
+                              </td>
+                              <td className={`px-8 py-5 text-right font-black ${t.type === TransactionType.INCOME ? 'text-emerald-600' : t.type === TransactionType.EXPENSE ? 'text-rose-500' : 'text-indigo-600'}`}>
+                                {t.type === TransactionType.EXPENSE ? '-' : t.type === TransactionType.INCOME ? '+' : ''}RS{t.amount.toLocaleString()}
+                              </td>
+                              <td className="px-8 py-5 text-right">
+                                <div className="flex items-center justify-end gap-2 transition-opacity">
+                                  <button onClick={() => startEditing(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Edit"><Edit3 className="w-4 h-4" /></button>
+                                  <button onClick={() => removeTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        {transactions.length === 0 && (
+                          <tr><td colSpan={4} className="py-12 text-center text-slate-300 font-bold">No activity found.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
               <div className="space-y-12">
                 <AIAssistant transactions={transactions} />
@@ -414,7 +606,16 @@ const App: React.FC = () => {
               <div className="lg:col-span-2 space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-black text-slate-900 capitalize">Income Stream</h2>
-                  <DateDropdown value={ledgerDateFilter} onChange={setLedgerDateFilter} />
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => handleQuickAdd('', 'income')}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      Add New
+                    </button>
+                    <DateDropdown value={ledgerDateFilter} onChange={setLedgerDateFilter} />
+                  </div>
                 </div>
                 <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
                   <table className="w-full text-left min-w-[600px]">
@@ -433,9 +634,9 @@ const App: React.FC = () => {
                           <td className="px-8 py-5 font-bold text-slate-900">{t.category}</td>
                           <td className="px-8 py-5 text-right font-black text-emerald-600">RS{t.amount.toLocaleString()}</td>
                           <td className="px-8 py-5 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => startEditing(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"><Edit3 className="w-4 h-4" /></button>
-                              <button onClick={() => removeTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
+                            <div className="flex items-center justify-end gap-2 transition-opacity">
+                              <button onClick={() => startEditing(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Edit"><Edit3 className="w-4 h-4" /></button>
+                              <button onClick={() => removeTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete"><Trash2 className="w-4 h-4" /></button>
                             </div>
                           </td>
                         </tr>
@@ -454,24 +655,69 @@ const App: React.FC = () => {
         {activeTab === 'expenses' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
-              <div className="flex items-center gap-3 mb-8">
-                <Sparkles className="w-5 h-5 text-rose-500" />
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Quick Expense Entry</h3>
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-5 h-5 text-rose-500" />
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Quick Expense Entry</h3>
+                </div>
+                {!isAddingQuickExpense && (
+                  <button 
+                    onClick={() => setIsAddingQuickExpense(true)}
+                    className="flex items-center gap-2 bg-rose-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-100 hover:bg-rose-600 transition-all active:scale-95"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    New Category
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4 md:gap-6">
-                {quickExpenseCategories.map(catName => {
-                  const config = getCategoryConfig(catName, customCategories);
-                  const IconComp = ICON_MAP[config.iconName] || Zap;
-                  return (
-                    <button key={catName} onClick={() => handleQuickAdd(catName)} className="flex flex-col items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 group active:scale-95 hover:bg-rose-50 hover:border-rose-100 transition-all">
-                      <div style={{ backgroundColor: config.color }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg transition-transform group-hover:-translate-y-1">
-                        <IconComp className="w-5 h-5" />
-                      </div>
-                      <span className="text-[9px] font-black text-slate-700 capitalize text-center leading-tight truncate w-full">{catName}</span>
-                    </button>
-                  );
-                })}
-              </div>
+
+              {isAddingQuickExpense ? (
+                <form onSubmit={handleCreateQuickCategory} className="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-300">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Category Name</label>
+                      <input 
+                        type="text" 
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
+                        placeholder="e.g. Gym, Netflix, Rent"
+                        className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-rose-500 outline-none font-bold text-sm"
+                        autoFocus
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Monthly Budget (RS)</label>
+                      <input 
+                        type="number" 
+                        value={newCatBudget}
+                        onChange={(e) => setNewCatBudget(e.target.value)}
+                        placeholder="Optional budget amount"
+                        className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-rose-500 outline-none font-bold text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Create & Add Expense</button>
+                    <button type="button" onClick={() => setIsAddingQuickExpense(false)} className="px-6 bg-white border-2 border-slate-100 text-slate-400 py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Cancel</button>
+                  </div>
+                </form>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4 md:gap-6">
+                  {quickExpenseCategories.map(catName => {
+                    const config = getCategoryConfig(catName, customCategories);
+                    const IconComp = ICON_MAP[config.iconName] || Zap;
+                    return (
+                      <button key={catName} onClick={() => handleQuickAdd(catName)} className="flex flex-col items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 group active:scale-95 hover:bg-rose-50 hover:border-rose-100 transition-all">
+                        <div style={{ backgroundColor: config.color }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg transition-transform group-hover:-translate-y-1">
+                          <IconComp className="w-5 h-5" />
+                        </div>
+                        <span className="text-[9px] font-black text-slate-700 capitalize text-center leading-tight truncate w-full">{catName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -489,10 +735,19 @@ const App: React.FC = () => {
               </div>
               <div className="lg:col-span-2 space-y-12">
                 <BudgetProgress budgets={budgets} monthlySpending={monthlySpending} customCategories={customCategories} />
+                
+                {/* Recent Expenditures in Expenses Tab */}
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-black text-slate-900 capitalize">Expense Journal</h2>
-                    <DateDropdown value={ledgerDateFilter} onChange={setLedgerDateFilter} />
+                    <div className="flex items-center gap-3">
+                      <div className="bg-rose-50 p-2.5 rounded-2xl border border-rose-100">
+                        <Zap className="w-5 h-5 text-rose-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-slate-800 tracking-tight">Recent Expenditures</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Manage Your Spending</p>
+                      </div>
+                    </div>
                   </div>
                   <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
                     <table className="w-full text-left min-w-[600px]">
@@ -505,21 +760,24 @@ const App: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {filteredTransactions.map(t => (
-                          <tr key={t.id} className="group hover:bg-slate-50 transition-colors">
-                            <td className="px-8 py-5 text-sm text-slate-500">{t.date}</td>
-                            <td className="px-8 py-5 font-bold text-slate-900">{t.category}</td>
-                            <td className="px-8 py-5 text-right font-black text-rose-500">RS{t.amount.toLocaleString()}</td>
-                            <td className="px-8 py-5 text-right">
-                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => startEditing(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"><Edit3 className="w-4 h-4" /></button>
-                                <button onClick={() => removeTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {filteredTransactions.length === 0 && (
-                          <tr><td colSpan={4} className="py-12 text-center text-slate-300 font-bold">No expense records found for this period.</td></tr>
+                        {transactions
+                          .filter(t => t.type === TransactionType.EXPENSE)
+                          .slice(0, 10)
+                          .map(t => (
+                            <tr key={t.id} className="group hover:bg-slate-50 transition-colors">
+                              <td className="px-8 py-5 text-sm text-slate-500">{t.date}</td>
+                              <td className="px-8 py-5 font-bold text-slate-900">{t.category}</td>
+                              <td className="px-8 py-5 text-right font-black text-rose-500">RS{t.amount.toLocaleString()}</td>
+                              <td className="px-8 py-5 text-right">
+                                <div className="flex items-center justify-end gap-2 transition-opacity">
+                                  <button onClick={() => startEditing(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Edit"><Edit3 className="w-4 h-4" /></button>
+                                  <button onClick={() => removeTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        {transactions.filter(t => t.type === TransactionType.EXPENSE).length === 0 && (
+                          <tr><td colSpan={4} className="py-12 text-center text-slate-300 font-bold">No expense records found.</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -546,6 +804,9 @@ const App: React.FC = () => {
             savingsGoals={savingsGoals}
             onAddSavingsGoal={addSavingsGoal}
             onDeleteSavingsGoal={deleteSavingsGoal}
+            onUpdateSavingsGoal={updateSavingsGoal}
+            onDeleteAccount={deleteAccount}
+            onUpdateAccount={updateAccount}
           />
         )}
 
@@ -555,6 +816,8 @@ const App: React.FC = () => {
             summary={summary} 
             customCategories={customCategories}
             budgets={budgets}
+            onStartEdit={startEditing}
+            onRemoveTransaction={removeTransaction}
           />
         )}
 
@@ -567,13 +830,19 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'settings' && (
-          <CategoryManager 
-            customCategories={customCategories} 
-            transactions={transactions}
-            onAdd={addCustomCategory} 
-            onUpdate={updateCustomCategory} 
-            onDelete={deleteCustomCategory} 
-          />
+          <div className="space-y-8">
+            <CategoryManager 
+              customCategories={customCategories} 
+              transactions={transactions}
+              onAdd={addCustomCategory} 
+              onUpdate={updateCustomCategory} 
+              onDelete={deleteCustomCategory} 
+            />
+            <CloudBackup 
+              onBackup={handleBackupData}
+              onRestore={handleRestoreData}
+            />
+          </div>
         )}
       </main>
 

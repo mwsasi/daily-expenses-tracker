@@ -54,6 +54,7 @@ export interface DailySummary {
   todayIncome?: number;
   // totalSavings field to track wealth reallocation
   totalSavings: number;
+  monthlySavings?: number;
 }
 
 // Define the AIStudio interface for the global window object to match ambient definitions

@@ -13,6 +13,7 @@ import {
   Building2,
   ChevronDown,
   Check,
+  X,
   Target,
   Plus,
   CreditCard,
@@ -41,6 +42,9 @@ interface CompoundSavingsProps {
   savingsGoals: SavingsGoal[];
   onAddSavingsGoal: (goal: SavingsGoal) => void;
   onDeleteSavingsGoal: (id: string) => void;
+  onUpdateSavingsGoal: (goal: SavingsGoal) => void;
+  onDeleteAccount: (name: string) => void;
+  onUpdateAccount: (oldName: string, newName: string) => void;
 }
 
 const CompoundSavings: React.FC<CompoundSavingsProps> = ({ 
@@ -57,10 +61,15 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
   onDateFilterChange,
   savingsGoals,
   onAddSavingsGoal,
-  onDeleteSavingsGoal
+  onDeleteSavingsGoal,
+  onUpdateSavingsGoal,
+  onDeleteAccount,
+  onUpdateAccount
 }) => {
   const [bankFilter, setBankFilter] = useState<string>('all');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<string | null>(null);
+  const [newAccountName, setNewAccountName] = useState('');
 
   const filterByPreset = (txs: Transaction[], preset: DatePreset) => {
     const now = new Date();
@@ -193,13 +202,62 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
               {allAccounts.map((accName, idx) => {
                 const isActive = bankFilter === accName;
                 const balance = bankBreakdown.breakdown[accName] || 0;
+                const isEditing = editingAccount === accName;
+
                 return (
-                  <button key={accName} onClick={() => setBankFilter(isActive ? 'all' : accName)} className={`flex items-center justify-between p-6 rounded-2xl border-2 transition-all duration-300 ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-50 text-slate-800'}`}>
-                    <p className={`font-black text-sm capitalize truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>{accName}</p>
-                    <div className={`px-4 py-2 rounded-full ${isActive ? 'bg-white/20' : 'bg-slate-100'} border border-black/5`}>
-                      <p className={`text-base font-black tracking-tighter tabular-nums ${isActive ? 'text-white' : 'text-slate-900'}`}>RS{formatCurrency(balance)}</p>
-                    </div>
-                  </button>
+                  <div key={accName} className="group relative">
+                    {isEditing ? (
+                      <div className="flex items-center gap-2 p-4 bg-white border-2 border-indigo-500 rounded-2xl shadow-lg animate-in zoom-in-95 duration-200">
+                        <input 
+                          type="text" 
+                          value={newAccountName}
+                          onChange={(e) => setNewAccountName(e.target.value)}
+                          className="flex-1 bg-slate-50 border-none focus:ring-0 text-sm font-black text-slate-800 px-3 py-2 rounded-xl"
+                          autoFocus
+                        />
+                        <button 
+                          onClick={() => { onUpdateAccount(accName, newAccountName); setEditingAccount(null); }}
+                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setEditingAccount(null)}
+                          className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => setBankFilter(isActive ? 'all' : accName)} 
+                          className={`flex-1 flex items-center justify-between p-6 rounded-2xl border-2 transition-all duration-300 ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-50 text-slate-800'}`}
+                        >
+                          <p className={`font-black text-sm capitalize truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>{accName}</p>
+                          <div className={`px-4 py-2 rounded-full ${isActive ? 'bg-white/20' : 'bg-slate-100'} border border-black/5`}>
+                            <p className={`text-base font-black tracking-tighter tabular-nums ${isActive ? 'text-white' : 'text-slate-900'}`}>RS{formatCurrency(balance)}</p>
+                          </div>
+                        </button>
+                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => { setEditingAccount(accName); setNewAccountName(accName); }}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl"
+                            title="Rename Institution"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => onDeleteAccount(accName)}
+                            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl"
+                            title="Remove Institution"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -231,6 +289,7 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
             goals={savingsGoals} 
             onAdd={onAddSavingsGoal} 
             onDelete={onDeleteSavingsGoal} 
+            onUpdate={onUpdateSavingsGoal}
             transactions={transactions}
             accounts={allAccounts}
           />
@@ -266,11 +325,11 @@ const CompoundSavings: React.FC<CompoundSavingsProps> = ({
                         </span>
                       </td>
                       <td className="px-8 py-6 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => onStartEdit(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all">
+                        <div className="flex items-center justify-end gap-2 transition-opacity">
+                          <button onClick={() => onStartEdit(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Edit">
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => onRemoveTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                          <button onClick={() => onRemoveTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all" title="Delete">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>

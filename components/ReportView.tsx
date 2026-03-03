@@ -17,7 +17,9 @@ import {
   Calendar,
   Loader2,
   Download,
-  FileJson
+  FileJson,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -47,9 +49,17 @@ interface ReportViewProps {
   summary: DailySummary;
   customCategories: CategoryConfig[];
   budgets: Record<string, number>;
+  onStartEdit: (t: Transaction) => void;
+  onRemoveTransaction: (id: string) => void;
 }
 
-const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCategories }) => {
+const ReportView: React.FC<ReportViewProps> = ({ 
+  transactions, 
+  summary, 
+  customCategories,
+  onStartEdit,
+  onRemoveTransaction
+}) => {
   const todayStr = new Date().toISOString().split('T')[0];
   
   const [datePreset, setDatePreset] = useState<DatePreset>('thisMonth');
@@ -267,7 +277,13 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
 
         let val = 0;
         if (col === 'Opening Balance') val = day.categories['Opening Balance'] || 0;
-        else if (col === 'Daily Income') val = day.categories['Daily Income'] || 0;
+        else if (col === 'Daily Income') val = day.income;
+        else if (col === 'Savings') val = day.savings;
+        else if (col === 'Others') {
+          const knownExpenseCols = ['Fuel', 'Bike', 'Bike Repair', 'Food', 'Tea', 'House Expenses', 'Mobile Topup', 'Internet Topup', 'Parcel', 'Buy Accessories'];
+          const knownExpenses = knownExpenseCols.reduce((sum, c) => sum + (day.categories[c] || 0), 0);
+          val = day.expenses - knownExpenses;
+        }
         else val = day.categories[col] || 0;
         
         totals[col] += val;
@@ -387,7 +403,13 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
         } else if (col === 'Opening Balance') {
           value = day.categories['Opening Balance'] || 0;
         } else if (col === 'Daily Income') {
-          value = day.categories['Daily Income'] || 0;
+          value = day.income;
+        } else if (col === 'Savings') {
+          value = day.savings;
+        } else if (col === 'Others') {
+          const knownExpenseCols = ['Fuel', 'Bike', 'Bike Repair', 'Food', 'Tea', 'House Expenses', 'Mobile Topup', 'Internet Topup', 'Parcel', 'Buy Accessories'];
+          const knownExpenses = knownExpenseCols.reduce((sum, c) => sum + (day.categories[c] || 0), 0);
+          value = day.expenses - knownExpenses;
         } else if (col === 'Total Expenses') {
           value = day.expenses;
         } else {
@@ -612,8 +634,8 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
           <div className="flex items-center gap-3">
             <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm"><Table className="w-5 h-5 text-emerald-600" aria-hidden="true" /></div>
             <div>
-              <h3 className="text-xl font-black text-slate-800 tracking-tight capitalize">Financial Ledger (Live)</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 capitalize">True Running Balance Accounting</p>
+              <h3 className="text-xl font-black text-slate-800 tracking-tight capitalize">Detailed Transaction History</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 capitalize">Edit or Delete Individual Entries</p>
             </div>
           </div>
           <div className="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm"><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest capitalize">{periodTransactions.length} Verified Entries</span></div>
@@ -623,29 +645,39 @@ const ReportView: React.FC<ReportViewProps> = ({ transactions, summary, customCa
             <thead>
               <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200 capitalize">
                 <th className="px-8 py-5">Value Date</th>
-                <th className="px-8 py-5">Category Context</th>
+                <th className="px-8 py-5">Category</th>
                 <th className="px-8 py-5">Note / Details</th>
-                <th className="px-8 py-5 text-right">Inflow/Outflow</th>
-                <th className="px-8 py-5 text-right">Cash in Hand</th>
+                <th className="px-8 py-5 text-right">Amount</th>
+                <th className="px-8 py-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-xs">
-              {ledgerData.map((row: LedgerDay) => (
-                <tr key={row.date} className="hover:bg-slate-50/80 transition-colors group">
-                  <td className="px-8 py-5 font-bold text-slate-400 group-hover:text-slate-800 transition-colors">{row.date}</td>
-                  <td className="px-8 py-5 font-black text-slate-800 uppercase tracking-tight capitalize">Day Summary</td>
-                  <td className="px-8 py-5 italic text-slate-500 capitalize">Accumulated daily activity</td>
-                  <td className={`px-8 py-5 text-right font-black text-sm tracking-tight ${(row.income - row.expenses - row.savings) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {(row.income - row.expenses - row.savings) >= 0 ? '+' : ''}RS{formatCurrency(row.income - row.expenses - row.savings)}
+              {periodTransactions.map((t: Transaction) => (
+                <tr key={t.id} className="hover:bg-slate-50/80 transition-colors group">
+                  <td className="px-8 py-5 font-bold text-slate-400 group-hover:text-slate-800 transition-colors">{t.date}</td>
+                  <td className="px-8 py-5">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${t.type === TransactionType.INCOME ? 'bg-emerald-500' : t.type === TransactionType.EXPENSE ? 'bg-rose-500' : 'bg-indigo-500'}`}></span>
+                      <span className="font-black text-slate-800 uppercase tracking-tight capitalize">{t.category}</span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-5 italic text-slate-500 capitalize">{t.note || '---'}</td>
+                  <td className={`px-8 py-5 text-right font-black text-sm tracking-tight ${t.type === TransactionType.INCOME ? 'text-emerald-600' : t.type === TransactionType.EXPENSE ? 'text-rose-600' : 'text-indigo-600'}`}>
+                    {t.type === TransactionType.EXPENSE ? '-' : t.type === TransactionType.INCOME ? '+' : ''}RS{formatCurrency(t.amount)}
                   </td>
                   <td className="px-8 py-5 text-right">
-                    <span className="bg-slate-100 text-slate-900 px-4 py-1.5 rounded-full font-black tabular-nums border border-slate-200">
-                      RS{formatCurrency(row.available)}
-                    </span>
+                    <div className="flex items-center justify-end gap-2 transition-opacity">
+                      <button onClick={() => onStartEdit(t)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Edit">
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => onRemoveTransaction(t.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
-              {ledgerData.length === 0 && (
+              {periodTransactions.length === 0 && (
                 <tr><td colSpan={5} className="py-24 text-center" aria-live="polite"><div className="flex flex-col items-center gap-4 opacity-10"><TrendingDown className="w-16 h-16" aria-hidden="true" /><p className="text-sm font-black uppercase tracking-[0.2em] capitalize">Zero Transactions Found For Criteria</p></div></td></tr>
               )}
             </tbody>

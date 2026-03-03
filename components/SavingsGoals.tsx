@@ -1,24 +1,46 @@
 
 import React, { useState } from 'react';
 import { SavingsGoal, Transaction } from '../types';
-import { Target, Plus, Trash2, CheckCircle2, MoreHorizontal, X, LayoutDashboard, Calculator, Palette } from 'lucide-react';
+import { Target, Plus, Trash2, Edit3, CheckCircle2, MoreHorizontal, X, LayoutDashboard, Calculator, Palette } from 'lucide-react';
 import { ICON_MAP, PRESET_COLORS } from '../constants';
 
 interface SavingsGoalsProps {
   goals: SavingsGoal[];
   onAdd: (goal: SavingsGoal) => void;
   onDelete: (id: string) => void;
+  onUpdate: (goal: SavingsGoal) => void;
   transactions: Transaction[];
   accounts: string[];
 }
 
-const SavingsGoals: React.FC<SavingsGoalsProps> = ({ goals, onAdd, onDelete, transactions, accounts }) => {
+const SavingsGoals: React.FC<SavingsGoalsProps> = ({ goals, onAdd, onDelete, onUpdate, transactions, accounts }) => {
   const [isAdding, setIsAdding] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [iconName, setIconName] = useState('Target');
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const [linkedAccount, setLinkedAccount] = useState('all');
+
+  const handleStartEdit = (goal: SavingsGoal) => {
+    setEditingGoal(goal);
+    setName(goal.name);
+    setTarget(goal.targetAmount.toString());
+    setIconName(goal.iconName);
+    setColor(goal.color);
+    setLinkedAccount(goal.linkedAccount || 'all');
+    setIsAdding(true);
+  };
+
+  const handleCancel = () => {
+    setIsAdding(false);
+    setEditingGoal(null);
+    setName('');
+    setTarget('');
+    setIconName('Target');
+    setColor(PRESET_COLORS[0]);
+    setLinkedAccount('all');
+  };
 
   const calculateProgress = (goal: SavingsGoal) => {
     const relevantTxs = transactions.filter(t => {
@@ -36,19 +58,28 @@ const SavingsGoals: React.FC<SavingsGoalsProps> = ({ goals, onAdd, onDelete, tra
     e.preventDefault();
     if (!name || !target) return;
 
-    onAdd({
-      id: crypto.randomUUID(),
-      name,
-      targetAmount: parseFloat(target),
-      currentAmount: 0,
-      color,
-      iconName,
-      linkedAccount: linkedAccount === 'all' ? undefined : linkedAccount
-    });
+    if (editingGoal) {
+      onUpdate({
+        ...editingGoal,
+        name,
+        targetAmount: parseFloat(target),
+        color,
+        iconName,
+        linkedAccount: linkedAccount === 'all' ? undefined : linkedAccount
+      });
+    } else {
+      onAdd({
+        id: crypto.randomUUID(),
+        name,
+        targetAmount: parseFloat(target),
+        currentAmount: 0,
+        color,
+        iconName,
+        linkedAccount: linkedAccount === 'all' ? undefined : linkedAccount
+      });
+    }
 
-    setName('');
-    setTarget('');
-    setIsAdding(false);
+    handleCancel();
   };
 
   return (
@@ -76,8 +107,8 @@ const SavingsGoals: React.FC<SavingsGoalsProps> = ({ goals, onAdd, onDelete, tra
       {isAdding && (
         <form onSubmit={handleAddGoal} className="bg-slate-50 p-6 rounded-[2rem] border-2 border-dashed border-indigo-200 space-y-4 animate-in fade-in zoom-in-95 duration-300">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight">Set New Milestone</h4>
-            <button type="button" onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight">{editingGoal ? 'Revise Milestone' : 'Set New Milestone'}</h4>
+            <button type="button" onClick={handleCancel} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -125,7 +156,7 @@ const SavingsGoals: React.FC<SavingsGoalsProps> = ({ goals, onAdd, onDelete, tra
           </div>
 
           <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl active:scale-95">
-            Lock Target
+            {editingGoal ? 'Update Target' : 'Lock Target'}
           </button>
         </form>
       )}
@@ -154,12 +185,20 @@ const SavingsGoals: React.FC<SavingsGoalsProps> = ({ goals, onAdd, onDelete, tra
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Target: RS{goal.targetAmount.toLocaleString()}</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => onDelete(goal.id)}
-                  className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleStartEdit(goal)}
+                    className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => onDelete(goal.id)}
+                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">

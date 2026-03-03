@@ -70,7 +70,7 @@ export const DEFAULT_CATEGORIES: CategoryConfig[] = [
   { id: 'daily_income', name: 'Daily Income', iconName: 'PlusCircle', color: '#10b981', type: TransactionType.INCOME },
   { id: 'savings_default', name: 'Savings', iconName: 'PiggyBank', color: '#6366f1', type: TransactionType.SAVINGS },
   { id: 'fuel', name: 'Fuel', iconName: 'Fuel', color: '#f97316', type: TransactionType.EXPENSE },
-  { id: 'bike', name: 'Bike', iconName: 'Bike', color: '#8b5cf6', type: TransactionType.EXPENSE },
+  { id: 'bike', name: 'Bike Accessories', iconName: 'Bike', color: '#8b5cf6', type: TransactionType.EXPENSE },
   { id: 'bike_repair', name: 'Bike Repair', iconName: 'Wrench', color: '#ef4444', type: TransactionType.EXPENSE },
   { id: 'food', name: 'Food', iconName: 'Utensils', color: '#d97706', type: TransactionType.EXPENSE },
   { id: 'tea', name: 'Tea', iconName: 'Coffee', color: '#ca8a04', type: TransactionType.EXPENSE },
